@@ -1,0 +1,24 @@
+CPU===================================
+init time: 307
+0  once time: 246
+
+1  once time: 68
+
+2  once time: 64
+
+3  once time: 65
+
+4  once time: 66
+
+GPU================================
+init time: 916
+2020-02-04 16:40:28.285054: I tensorflow/stream_executor/dso_loader.cc:152] successfully opened CUDA library cublas64_100.dll locally
+0  once time: 1407
+
+1  once time: 43
+
+2  once time: 45
+
+3  once time: 43
+
+4  once time: 47

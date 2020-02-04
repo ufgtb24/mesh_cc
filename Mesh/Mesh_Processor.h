@@ -27,24 +27,23 @@ class MESH_API Mesh_Processor
 {
 public:
 	Mesh_Processor(string graph_path, string python_path, string script_name,
-		int coarsen_times, int coarsen_level, int adj_K);
+		int coarsen_times, int coarsen_level, bool use_GPU = false);
 	~Mesh_Processor();
-	void predict(float* vertice, int* adj, int pt_num, float* output);
+	void predict(float* vertice, int* adj, int pt_num, int init_K,float** output);
 private:
 	PyObject* pFunction;
 	unique_ptr<Session> sess;
 
 	const int c_times;
 	const int c_level;
-	const int K;
 
 	wchar_t* GetWC(string str);
 	int init_numpy();
 	void init_python(string python_path, string script_name);
 
 	Status LoadGraph  (const string& graph_file_name,
-		unique_ptr<tensorflow::Session>* session);
+		unique_ptr<tensorflow::Session>* session, bool use_GPU);
 
-	PyObject* coarsen(int* adj, int pt_num);
+	PyObject* coarsen(int* adj, int pt_num, int init_K);
 };
 

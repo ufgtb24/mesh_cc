@@ -86,45 +86,44 @@ int main()
 	int coarsen_times = 2;
 	int coarsen_level = 3;
 	const int pt_num = 1000;
-	const int K = 20;
-	Mesh_Processor* mp = new Mesh_Processor(graph_path, python_path, "coarsening",
-		coarsen_times, coarsen_level, K);
+	const int K = 13; // 需要调整
+
 	int* adj = new int[pt_num * K];
-	float* x = new float[pt_num * 3];
 	memset(adj, 0, sizeof(int) * pt_num * K);
 	int actual_pt_num = load_file("E:\\VS_Projects\\Mesh\\Test\\adj.txt", adj, K);
+
+	float* x = new float[pt_num * 3];
 	load_file("E:\\VS_Projects\\Mesh\\Test\\x.txt", x, 3);
-	//for (int i = 0; i < actual_pt_num; i++) {
-	//	for(int j = 0; j < K; j++)
-	//	  cout<< adj[i * K + j] <<" ";
-	//	cout << endl;
-	//}
-	//getchar();
-	float output[4];
+
 	clock_t  start, stop;
-	mp->predict(x, adj, actual_pt_num, output);
-	for (int j = 0; j < 4; j++) {
-		cout << output[j] << "  ";
-	}
-	cout << endl << "*********** time monitor" << endl;
-
 	start = clock();
-
-	for (int i = 0; i < 10; i++) {
-		float outputn[4];
-		mp->predict(x, adj, actual_pt_num, outputn);
-		for (int j = 0; j < 4; j++) {
-			cout << outputn[j] << "  ";
-		}
-		cout << endl;
-	}
+	Mesh_Processor* mp = new Mesh_Processor(graph_path, python_path, "coarsening",
+		coarsen_times, coarsen_level,false);
 	stop = clock();
 
-	cout<<"time cost: "<<stop - start<<" ms";
-	getchar();
+	cout << "init time: " << stop - start << endl;
 
-	//cout << output[0] << "  " << output[1] << "  "\
-	//	<< output[2] << "  " << output[3] << "  ";
+	float** output = new float* [4];
+	for (int i = 0; i < 4; i++) {
+		output[i] = new float[4];
+	}
+
+	for (int i = 0; i < 5; i++) {
+		clock_t  start, stop;
+		start = clock();
+		mp->predict(x, adj, actual_pt_num, 13, output);
+		stop = clock();
+		cout << i<<"  once time: " << stop - start << "\n\n";
+
+
+		//for (int i = 0; i < 4; i++) {
+		//	for (int j = 0; j < 4; j++) {
+		//		cout << output[i][j] << "  ";
+		//	}
+		//	cout << endl;
+		//}
+	}
+	getchar();
 	return 0;
 }
 

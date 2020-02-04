@@ -4,14 +4,14 @@
 #include <numpy/arrayobject.h>
 
 Mesh_Processor::Mesh_Processor(string graph_path, string python_path, 
-	string script_name, int coarsen_times, int coarsen_level, int adj_K):
-	c_times(coarsen_times), c_level(coarsen_level), K(adj_K)
+	string script_name, int coarsen_times, int coarsen_level,bool use_GPU):
+	c_times(coarsen_times), c_level(coarsen_level)
 
 {
 
 	init_python(python_path, script_name);
 
-	Status load_graph_status = LoadGraph(graph_path, &sess);
+	Status load_graph_status = LoadGraph(graph_path, &sess, use_GPU);
 	if (!load_graph_status.ok()) {
 		LOG(ERROR) << "\n!!!!!load_graph_status!!!!!\n";
 		LOG(ERROR) << load_graph_status;
@@ -61,7 +61,8 @@ void Mesh_Processor::init_python(string python_path, string script_name)
 }
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
-	unique_ptr<Session>* session) {
+	unique_ptr<Session>* session,bool use_GPU) {
+
 	GraphDef graph_def;
 	Status load_graph_status =
 		ReadBinaryProto(Env::Default(), graph_file_name, &graph_def);
@@ -69,35 +70,55 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 		return errors::NotFound("Failed to load compute graph at '",
 			graph_file_name, "'");
 	}
-	SessionOptions session_options;
-	_putenv("CUDA_VISIBLE_DEVICES=""");
-	session_options.config.mutable_gpu_options()->set_allow_growth(true);
 
-	// 	session->reset(NewSession(session_options));
-	session->reset(NewSession(session_options));
+	///////////
+	if (!use_GPU) {
+
+		SessionOptions options;
+		ConfigProto* config = &options.config;
+		// disabled GPU entirely
+		(*config->mutable_device_count())["GPU"] = 0;
+		// place nodes somewhere
+		config->set_allow_soft_placement(true);
+		session->reset(NewSession(options));
+
+	}
+	/////////
+	else {
+
+		SessionOptions session_options;
+		_putenv("CUDA_VISIBLE_DEVICES=""");
+		session_options.config.mutable_gpu_options()->set_allow_growth(true);
+		session->reset(NewSession(session_options));
+	}
+
 
 	Status session_create_status = (*session)->Create(graph_def);
 	if (!session_create_status.ok()) {
+		cout << "graph not created\n";
+
 		return session_create_status;
 	}
+
 	return Status::OK();
 }
 
-PyObject* Mesh_Processor::coarsen(int* adj, int pt_num)
+PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 {
 
-	npy_intp Dims[2] = { pt_num, K };
+	npy_intp Dims[2] = { pt_num, init_K };
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
 	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims, NPY_INT, adj);
-	PyObject* ArgArray = PyTuple_New(4);
+	PyObject* ArgArray = PyTuple_New(3);
 	PyTuple_SetItem(ArgArray, 0, Adj);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", K));
-	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_times));
-	PyTuple_SetItem(ArgArray, 3, Py_BuildValue("i", c_level));
+	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", c_times));
+	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_level));
 
 	//PyObject* pFunc = PyDict_GetItemString(pDict, "multi_coarsen");
+
 	PyObject* FuncOneBack = PyObject_CallObject(pFunction, ArgArray);
+
 	//Py_DECREF(Adj);
 	//Py_DECREF(ArgArray);
 	return FuncOneBack;
@@ -108,9 +129,9 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 }
 
 
-void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, float* output_interface)
+void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K, float** output_interface)
 {
-	PyObject* perms_adjs = coarsen(adj, pt_num);
+	PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
 	//int* imNumPt = new int(1);
 	vector<pair<string, Tensor>> inputs;
 	vector<string> input_names;
@@ -127,6 +148,7 @@ void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, float* output
 	input_names.push_back("vertice");
 
 	int perm_idx = 0;
+
 	for (int i = 0; i < c_times; i++) {
 		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete perm
 
@@ -168,12 +190,20 @@ void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, float* output
 
 	}
 	vector<Tensor> outputs;
+
 	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
-	cout << status << endl;
+
 	auto output_c = outputs[0].flat<float>();
-	for (int i = 0; i < 4; i++)
+
+	output_interface[0][3] = output_interface[1][3] = output_interface[2][3] = \
+		output_interface[3][0] = output_interface[3][1] = output_interface[3][2] = 0;
+	output_interface[3][3] = 1;
+	for (int i = 0; i < 3; i++)
 	{
-		output_interface[i] = output_c(i);
+		for (int j = 0; j < 3; j++)
+		{
+			output_interface[i][j] = output_c(3*i+j);
+		}
 	}
 	//Py_DECREF(perms_adjs);
 

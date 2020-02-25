@@ -129,7 +129,9 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 }
 
 
-void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K, float** output_interface)
+
+
+void Mesh_Processor::predict_orientation(float* vertice, int* adj, int pt_num, int init_K, float** output_interface)
 {
 	PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
 	//int* imNumPt = new int(1);
@@ -204,6 +206,80 @@ void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K, f
 		{
 			output_interface[i][j] = output_c(3*i+j);
 		}
+	}
+	//Py_DECREF(perms_adjs);
+
+}
+
+void Mesh_Processor::predict_feature(float* vertice, int* adj, int pt_num, int init_K, float* output_interface)
+{
+	PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
+	//int* imNumPt = new int(1);
+	vector<pair<string, Tensor>> inputs;
+	vector<string> input_names;
+	int* imNumPt = new int(1);
+
+	const int64_t tensorDims[3] = { 1,pt_num ,3 };
+	TF_Tensor* tftensor = TF_NewTensor(TF_FLOAT, tensorDims, 3,
+		(float*)vertice, ((size_t)pt_num * 3) * sizeof(float),
+		DeallocateTensor, NULL);
+
+
+	Tensor vertice_tensor=TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
+	inputs.push_back({ "vertice",vertice_tensor });
+	input_names.push_back("vertice");
+
+	int perm_idx = 0;
+
+	for (int i = 0; i < c_times; i++) {
+		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete perm
+
+		const int64_t perm_dims[1] = { perm->dimensions[0] };
+
+		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, perm_dims, 1,
+			(int*)(perm->data), (perm->dimensions[0]) * sizeof(int),
+			DeallocateTensor, NULL);
+
+		Tensor perm_tensor = TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
+
+		ostringstream ostr;
+		ostr << "perm_" << perm_idx++;
+		string node_name = ostr.str();
+
+		inputs.push_back({ node_name,perm_tensor });
+		input_names.push_back(node_name);
+
+	}
+	int adj_idx = 0;
+
+	for (int i = c_times; i < 2 * c_times + 1; i++) {
+		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete adj
+
+		const int64_t adj_dims[2] = { adj->dimensions[0],adj->dimensions[1] };
+
+		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, adj_dims, 2,
+			(int*)(adj->data), (adj->dimensions[0] * adj->dimensions[1]) * sizeof(int),
+			DeallocateTensor, NULL);
+
+		Tensor adj_tensor = TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
+
+		ostringstream ostr;
+		ostr << "adj_" << adj_idx++;
+		string node_name = ostr.str();
+
+		inputs.push_back({ node_name,adj_tensor });
+		input_names.push_back(node_name);
+
+	}
+	vector<Tensor> outputs;
+
+	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
+
+	auto output_c = outputs[0].flat<float>();
+	const long count = output_c.size();
+	for (int i = 0; i < count; i++)
+	{
+		output_interface[i] = output_c(i);
 	}
 	//Py_DECREF(perms_adjs);
 

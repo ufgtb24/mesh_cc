@@ -98,10 +98,11 @@ int main()
 	clock_t  start, stop;
 	start = clock();
 	Mesh_Processor* mp = new Mesh_Processor(graph_path, python_path, "coarsening",
-		coarsen_times, coarsen_level,false);
+		coarsen_times, coarsen_level,true);
 	stop = clock();
 
 	cout << "init time: " << stop - start << endl;
+
 
 	float** output = new float* [4];
 	for (int i = 0; i < 4; i++) {

@@ -29,7 +29,9 @@ public:
 	Mesh_Processor(string graph_path, string python_path, string script_name,
 		int coarsen_times, int coarsen_level, bool use_GPU = false);
 	~Mesh_Processor();
-	void predict(float* vertice, int* adj, int pt_num, int init_K,float** output);
+	void predict_orientation(float* vertice, int* adj, int pt_num, int init_K, float** output);
+	void predict_feature(float* vertice, int* adj, int pt_num, int init_K, float* output);
+
 private:
 	PyObject* pFunction;
 	unique_ptr<Session> sess;

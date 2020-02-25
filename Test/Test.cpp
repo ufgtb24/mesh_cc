@@ -112,7 +112,7 @@ int main()
 	for (int i = 0; i < 5; i++) {
 		clock_t  start, stop;
 		start = clock();
-		mp->predict(x, adj, actual_pt_num, 13, output);
+		mp->predict_orientation(x, adj, actual_pt_num, 13, output);
 		stop = clock();
 		cout << i<<"  once time: " << stop - start << "\n\n";
 

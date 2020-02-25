@@ -30,7 +30,7 @@ public:
 		int coarsen_times, int coarsen_level, bool use_GPU = false);
 	~Mesh_Processor();
 	void predict_orientation(float* vertice, int* adj, int pt_num, int init_K, float** output);
-	void predict_feature(float* vertice, int* adj, int pt_num, int init_K, float* output);
+	void predict_feature(float* vertice, int* adj, int pt_num, int init_K, int part_id, float** output);
 
 private:
 	PyObject* pFunction;
@@ -42,6 +42,7 @@ private:
 	wchar_t* GetWC(string str);
 	int init_numpy();
 	void init_python(string python_path, string script_name);
+	void predict(float* vertice, int* adj, int pt_num, int init_K, int part_id,float* output);
 
 	Status LoadGraph  (const string& graph_file_name,
 		unique_ptr<tensorflow::Session>* session, bool use_GPU);

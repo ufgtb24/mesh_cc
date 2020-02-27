@@ -46,7 +46,7 @@ private:
 	wchar_t* GetWC(string str);
 	int init_numpy();
 	void init_python(string python_path, string script_name, Usage usage);
-	float* predict(float* vertice, int* adj, int pt_num, int init_K);
+	float* predict(float* vertice, int* adj, int pt_num, int init_K, int& out_size);
 
 	Status LoadGraph  (const string& graph_file_name,
 		unique_ptr<tensorflow::Session>* session, bool use_GPU);

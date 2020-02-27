@@ -8,6 +8,9 @@ Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, str
 	c_times(coarsen_times), c_level(coarsen_level)
 
 {
+	
+
+	//cout << FEAT << ORIEN << LD << RD << LU << RU << endl;
 
 	init_python(python_path, script_name, usage);
 
@@ -55,7 +58,8 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 	if (pModule == nullptr)
 		cout << "no script is load";
 
-	//天坑！！！！！！！ 脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
+	//天坑！！！！！！！
+	//脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
 	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
 	//Python中的返回数据一定要显式指定类型为32bit，因为默认是64bit，而
 	//C++ 中，即使是64位机器 float 和 int 也是32 位的！！！！！！
@@ -131,8 +135,8 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
 
-	//Py_DECREF(Adj);
-	//Py_DECREF(ArgArray);
+	Py_DECREF(Adj);
+	Py_DECREF(ArgArray);
 	return FuncOneBack;
 }
 
@@ -145,7 +149,6 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
 	PyObject* ArgArray = PyTuple_New(2);
 	PyTuple_SetItem(ArgArray, 0, X);
-	cout << "part_id = " << part_id << endl;
 	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
@@ -191,8 +194,8 @@ void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_nu
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, 0);
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
 
-
-	 float* output_tmp = predict((float*)(vertice_np->data), adj, pt_num, init_K);
+	int output_size;
+	 float* output_tmp = predict((float*)(vertice_np->data), adj, pt_num, init_K, output_size);
 
 	output[0][3] = output[1][3] = output[2][3] = \
 		output[3][0] = output[3][1] = output[3][2] = 0;
@@ -212,11 +215,13 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 	int init_K, PartID part_id, float** output)
 {
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, part_id);
-	cout<<"nm size :  "<< PyList_Size(vertice_center)<<endl;
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
 	PyArrayObject* center_np = (PyArrayObject*)PyList_GetItem(vertice_center, 1);//TODO delete perm
-	float* feat_local =predict((float*)(vertice_np->data), adj, pt_num, init_K);
-	PyObject* outputList=ivs_normalize(feat_local, (float*)(center_np->data), 8, part_id);
+	int ouput_size;
+	float* feat_local =predict((float*)(vertice_np->data), adj, pt_num, init_K, ouput_size);
+	int feat_num = ouput_size / 3;
+	cout << "output feature num = " << feat_num << endl;
+	PyObject* outputList=ivs_normalize(feat_local, (float*)(center_np->data), feat_num, part_id);
 	PyArrayObject* feat_np = (PyArrayObject*)PyList_GetItem(outputList, 0);
 	float* feat_world= (float*)(feat_np->data);
 
@@ -231,7 +236,7 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 }
 
- float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K) {
+ float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
 
 	 
 	 PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
@@ -302,9 +307,7 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 	auto output_c = outputs[0].flat<float>();
 	float*  output_test= (float*)(output_c.data());
-
-
-
+	out_size = output_c.size();
 
 
 	return output_test;

@@ -6,7 +6,7 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\output_graph.pb";
 	string python_path = "D:/Python";
@@ -17,10 +17,10 @@ int main0()
 
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
-	int actual_pt_num = load_file("E:\\VS_Projects\\Mesh\\Test\\adj.txt", adj, K);
+	int actual_pt_num = load_file("E:\\VS_Projects\\Mesh\\Test\\adj_o.txt", adj, K);
 
 	float* x = new float[pt_num * 3];
-	load_file("E:\\VS_Projects\\Mesh\\Test\\x.txt", x, 3);
+	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_o.txt", x, 3);
 
 	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::ORIEN, false, python_path, "coarsening",
 		coarsen_times, coarsen_level);

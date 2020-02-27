@@ -155,7 +155,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Load_Files.cpp" />
-    <ClCompile Include="Test.cpp" />
+    <ClCompile Include="Test_orientation.cpp" />
     <ClCompile Include="Test_feature.cpp" />
   </ItemGroup>
   <ItemGroup>

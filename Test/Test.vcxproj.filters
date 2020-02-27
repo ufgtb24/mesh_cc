@@ -15,13 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Test_feature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Load_Files.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Test_orientation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -438,5 +438,32 @@ def A_to_adj(A):
     return adj
 
 
+def normalize(world_coord,part_id):
+    '''
+    
+    :param world_coord:
+    :param vtype: 0DL   1DR   2UL   3 UR
+    :return:
+    '''
+    center = np.mean(world_coord, axis=0)
+
+    local_coord = world_coord - center
+    if part_id == 1:
+        local_coord = local_coord * [-1, 1, 1]
+    elif part_id == 2:
+        local_coord = local_coord * [1, -1, 1]
+    elif part_id == 3:
+        local_coord = local_coord * [-1, -1, 1]
+    return [local_coord.astype(np.float32),center]
+
+def ivs_normalize(local_coord,center,part_id):
+    if part_id == 1:
+        local_coord = local_coord * [-1, 1, 1]
+    elif part_id == 2:
+        local_coord = local_coord * [1, -1, 1]
+    elif part_id == 3:
+        local_coord = local_coord * [-1, -1, 1]
+    world_coord = local_coord + center
+    return [world_coord.astype(np.float32)]
     
 

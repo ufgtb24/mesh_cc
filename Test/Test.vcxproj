@@ -154,7 +154,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Load_Files.cpp" />
     <ClCompile Include="Test.cpp" />
+    <ClCompile Include="Test_feature.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mesh\Mesh.vcxproj">
@@ -166,6 +168,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="performance test.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Header.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

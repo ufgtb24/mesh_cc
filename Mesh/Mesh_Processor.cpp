@@ -3,13 +3,13 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
-Mesh_Processor::Mesh_Processor(string graph_path, string python_path, 
-	string script_name, int coarsen_times, int coarsen_level,bool use_GPU):
+Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, string python_path,
+	string script_name, int coarsen_times, int coarsen_level):
 	c_times(coarsen_times), c_level(coarsen_level)
 
 {
 
-	init_python(python_path, script_name);
+	init_python(python_path, script_name, usage);
 
 	Status load_graph_status = LoadGraph(graph_path, &sess, use_GPU);
 	if (!load_graph_status.ok()) {
@@ -22,7 +22,7 @@ Mesh_Processor::Mesh_Processor(string graph_path, string python_path,
 }
 Mesh_Processor::~Mesh_Processor()
 {
-	Py_DECREF(pFunction);
+	Py_DECREF(pFunc_Coarsen);
 
 }
 wchar_t* Mesh_Processor::GetWC(string str)
@@ -40,7 +40,7 @@ int Mesh_Processor::init_numpy() {//初始化 numpy 执行环境，主要是导入包，python2
 	import_array();
 }
 
-void Mesh_Processor::init_python(string python_path, string script_name)
+void Mesh_Processor::init_python(string python_path, string script_name,Usage usage)
 {
 	Py_SetPythonHome(GetWC(python_path));
 	Py_Initialize();
@@ -54,10 +54,24 @@ void Mesh_Processor::init_python(string python_path, string script_name)
 	PyObject* pModule = PyImport_ImportModule(script_name.c_str());//"coarsen"
 	if (pModule == nullptr)
 		cout << "no script is load";
-	//pDict = PyModule_GetDict(pModule);
-	pFunction = PyObject_GetAttrString(pModule, "multi_coarsen");//multi_coarsen
-	if (pFunction == nullptr)
-		cout << "no function is load";
+
+	//天坑！！！！！！！ 脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
+	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
+	//Python中的返回数据一定要显式指定类型为32bit，因为默认是64bit，而
+	//C++ 中，即使是64位机器 float 和 int 也是32 位的！！！！！！
+	pFunc_Coarsen = PyObject_GetAttrString(pModule, "multi_coarsen");//multi_coarsen
+	if (pFunc_Coarsen == nullptr)
+		cout << "no pFunc_Coarsen is load"<<endl;
+	pFunc_Normal = PyObject_GetAttrString(pModule, "normalize");//multi_coarsen
+	if (pFunc_Normal == nullptr)
+		cout << "no pFunc_Normal is load" << endl;
+
+	if (usage == Usage::FEAT) {
+	   pFunc_iNormal = PyObject_GetAttrString(pModule, "ivs_normalize");//multi_coarsen
+	   if (pFunc_iNormal == nullptr)
+		   cout << "no pFunc_iNormal is load" << endl;
+
+	}
 }
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
@@ -115,9 +129,50 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", c_times));
 	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_level));
 
-	//PyObject* pFunc = PyDict_GetItemString(pDict, "multi_coarsen");
+	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
 
-	PyObject* FuncOneBack = PyObject_CallObject(pFunction, ArgArray);
+	//Py_DECREF(Adj);
+	//Py_DECREF(ArgArray);
+	return FuncOneBack;
+}
+
+
+PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
+{
+	npy_intp Dims[2] = { pt_num, 3 };
+
+	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
+	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
+	PyObject* ArgArray = PyTuple_New(2);
+	PyTuple_SetItem(ArgArray, 0, X);
+	cout << "part_id = " << part_id << endl;
+	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
+
+	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
+
+	//Py_DECREF(Adj);
+	//Py_DECREF(ArgArray);
+
+	return FuncOneBack;
+}
+
+PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int feature_num,int part_id)
+{
+
+	npy_intp Dims_f[2] = { feature_num, 3 };
+	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
+
+	npy_intp Dims_c[1] = { 3 };
+	PyObject* C = PyArray_SimpleNewFromData(1, Dims_c, NPY_FLOAT, center);
+
+
+
+	PyObject* ArgArray = PyTuple_New(3);
+	PyTuple_SetItem(ArgArray, 0, F);
+	PyTuple_SetItem(ArgArray, 1, C);
+	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", part_id));
+
+	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
 
 	//Py_DECREF(Adj);
 	//Py_DECREF(ArgArray);
@@ -131,10 +186,13 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 
 
 
-void Mesh_Processor::predict_orientation(float* vertice, int* adj, int pt_num, int init_K, float** output)
+void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_num, int init_K, float** output)
 {
-	float output_tmp[3*3];
-	predict(vertice, adj, pt_num, init_K, -1, output_tmp);
+	PyObject* vertice_center = normalize(vertice_ori, pt_num, 0);
+	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
+
+
+	 float* output_tmp = predict((float*)(vertice_np->data), adj, pt_num, init_K);
 
 	output[0][3] = output[1][3] = output[2][3] = \
 		output[3][0] = output[3][1] = output[3][2] = 0;
@@ -150,41 +208,44 @@ void Mesh_Processor::predict_orientation(float* vertice, int* adj, int pt_num, i
 
 }
 
-void Mesh_Processor::predict_feature(float* vertice, int* adj, int pt_num, int init_K, int part_id, float** output)
+void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num, 
+	int init_K, PartID part_id, float** output)
 {
-	float output_tmp[15 * 3];
+	PyObject* vertice_center = normalize(vertice_ori, pt_num, part_id);
+	cout<<"nm size :  "<< PyList_Size(vertice_center)<<endl;
+	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
+	PyArrayObject* center_np = (PyArrayObject*)PyList_GetItem(vertice_center, 1);//TODO delete perm
+	float* feat_local =predict((float*)(vertice_np->data), adj, pt_num, init_K);
+	PyObject* outputList=ivs_normalize(feat_local, (float*)(center_np->data), 8, part_id);
+	PyArrayObject* feat_np = (PyArrayObject*)PyList_GetItem(outputList, 0);
+	float* feat_world= (float*)(feat_np->data);
 
-	predict(vertice, adj, pt_num, init_K, part_id, output_tmp);
 	for (int i = 0; i < 8; i++)
 	{
 		for (int j = 0; j < 3; j++)
 		{
-			output[i][j] = output_tmp[3 * i + j];
+			output[i][j] = feat_world[3 * i + j];
 		}
 	}
 	//Py_DECREF(perms_adjs);
 
 }
 
-void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K, int part_id, float* output) {
-	PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
+ float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K) {
+
+	 
+	 PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
 
 
 	//int* imNumPt = new int(1);
 	vector<pair<string, Tensor>> inputs;
 	vector<string> input_names;
 
-	if (part_id != -1) {
-		Tensor part_id_tensor(DT_INT32, TensorShape());
-		part_id_tensor.scalar<int32>()() = part_id;
-		inputs.push_back({ "part_id",part_id_tensor });
-		input_names.push_back("part_id");
 
-	}
 
 	const int64_t tensorDims[3] = { 1,pt_num ,3 };
 	TF_Tensor* tftensor = TF_NewTensor(TF_FLOAT, tensorDims, 3,
-		(float*)vertice, ((size_t)pt_num * 3) * sizeof(float),
+		vertice, ((size_t)pt_num * 3) * sizeof(float),
 		DeallocateTensor, NULL);
 
 
@@ -240,6 +301,12 @@ void Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K, i
 	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
 
 	auto output_c = outputs[0].flat<float>();
-	output=output_c.data();
+	float*  output_test= (float*)(output_c.data());
+
+
+
+
+
+	return output_test;
 
 }

@@ -7,7 +7,7 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\feature_back.pb";
 	string python_path = "D:/Python";

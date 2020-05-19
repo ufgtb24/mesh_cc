@@ -93,15 +93,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\VS_Projects\Mesh\Mesh</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\TensorFlowCplusplus\TeethDetect\TeethDetect;E:\VS_Projects\Mesh\Mesh</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>E:\MyDLTools\tensorflow1.13.1;E:\VS_Projects\Mesh\x64\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Mesh.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\MyDLTools\tensorflow1.13.1;E:\VS_Projects\Mesh\x64\Release;E:\TensorFlowCplusplus\TeethDetect\x64\Release</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Mesh.lib;TeethDetect.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -159,6 +159,9 @@
     <ClCompile Include="Test_feature.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\TensorFlowCplusplus\TeethDetect\TeethDetect\TeethDetect_GPU.vcxproj">
+      <Project>{ff444cde-666f-449f-8f54-c2f9546240da}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Mesh\Mesh.vcxproj">
       <Project>{01c3fa6d-164c-44fb-bc5e-a2319eda4e64}</Project>
     </ProjectReference>

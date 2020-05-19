@@ -3,13 +3,15 @@
 
 #include "Mesh_Processor.h"
 #include "Header.h"
+#include "TeethDetect.h"
+#include <time.h>
 
 
 
 
-int main()
+int main0()
 {
-	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\feature_back.pb";
+	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\feature_back_res.pb";
 	string python_path = "D:/Python";
 	int coarsen_times = 2;
 	int coarsen_level = 3;
@@ -32,17 +34,37 @@ int main()
 	for (int i = 0; i < 8; i++) {
 		output[i] = new float[3];
 	}
+	for (int i = 0; i < 5; i++) {
+		clock_t start = clock();
 
-	mp->predict_feature(x, adj, actual_pt_num, 13, Mesh_Processor::LU,output);
-
-
-	for (int i = 0; i < 8; i++) {
-		for (int j = 0; j < 3; j++) {
-			cout << output[i][j] << "  ";
-		}
-		cout << endl;
+		mp->predict_feature(x, adj, actual_pt_num, 13, Mesh_Processor::LU, output);
+	
+		clock_t end = clock();
+		cout << i << "  th run time is: " <<end - start << endl<<endl;
 	}
+
 	getchar();
+
+
+///////  TeethDetect
+//	int num, w, h;
+//	float** coord = new float* [16];
+//	for (int i = 0; i < 16; i++) {
+//		coord[i] = new float[7];
+//	}
+//
+//	TeethDetector* td = new TeethDetector(
+//		"E:/TensorFlowCplusplus/TeethDetect/x64/Release/output_graph.pb");
+//
+//	td->detect("E:/TensorFlowCplusplus/TeethDetect/x64/Release/low.png", num, coord, w, h);
+//	for (int i = 0; i < num; ++i) {
+//	for (int j = 0; j < 7; ++j)
+//		cout << coord[i][j] << "\t";
+//	std::cout << std::endl;
+//}
+//
+//	getchar();
+	///////////////
 	return 0;
 }
 

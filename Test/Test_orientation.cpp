@@ -6,11 +6,11 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\output_graph.pb";
 	string python_path = "D:/Python";
-	int coarsen_times = 2;
+	int coarsen_times = 3;
 	int coarsen_level = 3;
 	const int pt_num = 1000;
 	const int K = 13; // 需要调整

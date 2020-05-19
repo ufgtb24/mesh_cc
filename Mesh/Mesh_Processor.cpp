@@ -2,15 +2,13 @@
 #include "Mesh_Processor.h"
 #include <Python.h>
 #include <numpy/arrayobject.h>
-
+#include <time.h>
 Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, string python_path,
 	string script_name, int coarsen_times, int coarsen_level):
 	c_times(coarsen_times), c_level(coarsen_level)
 
 {
 	
-
-
 	init_python(python_path, script_name, usage);
 
 	Status load_graph_status = LoadGraph(graph_path, &sess, use_GPU);
@@ -44,6 +42,7 @@ int Mesh_Processor::init_numpy() {//初始化 numpy 执行环境，主要是导入包，python2
 
 void Mesh_Processor::init_python(string python_path, string script_name,Usage usage)
 {
+	clock_t start = clock();
 
 	Py_SetPythonHome(GetWC(python_path));
 	Py_Initialize();
@@ -75,11 +74,14 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 		   cout << "no pFunc_iNormal is load" << endl;
 
 	}
+	clock_t end = clock();
+	cout << "init_python time: " << end - start << endl;
+
 }
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 	unique_ptr<Session>* session,bool use_GPU) {
-
+	clock_t start = clock();
 	GraphDef graph_def;
 	Status load_graph_status =
 		ReadBinaryProto(Env::Default(), graph_file_name, &graph_def);
@@ -89,7 +91,7 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 	}
 
 	///////////
-	if (!use_GPU) {
+	//if (!use_GPU) {
 
 		SessionOptions options;
 		ConfigProto* config = &options.config;
@@ -99,15 +101,15 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 		config->set_allow_soft_placement(true);
 		session->reset(NewSession(options));
 
-	}
-	/////////
-	else {
+	//}
+	///////////
+	//else {
 
-		SessionOptions session_options;
-		_putenv("CUDA_VISIBLE_DEVICES=""");
-		session_options.config.mutable_gpu_options()->set_allow_growth(true);
-		session->reset(NewSession(session_options));
-	}
+	//	SessionOptions session_options;
+	//	_putenv("CUDA_VISIBLE_DEVICES=""");
+	//	session_options.config.mutable_gpu_options()->set_allow_growth(true);
+	//	session->reset(NewSession(session_options));
+	//}
 
 
 	Status session_create_status = (*session)->Create(graph_def);
@@ -116,13 +118,15 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 
 		return session_create_status;
 	}
+	clock_t end = clock();
+	cout << "LoadGraph time: " << end - start << endl;
 
 	return Status::OK();
 }
 
 PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 {
-	cout << "coarsen\n";
+	clock_t start = clock();
 	npy_intp Dims[2] = { pt_num, init_K };
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
@@ -137,7 +141,8 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 	Py_DECREF(Adj);
 	Py_DECREF(ArgArray);
 
-	cout << "end coarsen\n";
+	clock_t end = clock();
+	cout << "coarsen time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -145,7 +150,7 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 
 PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 {
-	cout << "normalize\n";
+	clock_t start = clock();
 
 	npy_intp Dims[2] = { pt_num, 3 };
 
@@ -157,14 +162,15 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
 
-	cout << "end normalize\n";
+	clock_t end = clock();
+	cout << "normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
 
 PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int feature_num,int part_id)
 {
-	cout << "ivs_normalize\n";
+	clock_t start = clock();
 
 	npy_intp Dims_f[2] = { feature_num, 3 };
 	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
@@ -180,7 +186,8 @@ PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int featur
 	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", part_id));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
-	cout << "end ivs_normalize\n";
+	clock_t end = clock();
+	cout << "ivs_normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -218,7 +225,6 @@ void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_nu
 void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num, 
 	int init_K, PartID part_id, float** output)
 {
-	cout << "inside predict_feature\n";
 
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, part_id);
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
@@ -235,23 +241,22 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 	PyArrayObject* feat_np = (PyArrayObject*)PyList_GetItem(outputList, 0);
 	float* feat_world= (float*)(feat_np->data);
 
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < feat_num; i++)
 	{
 		for (int j = 0; j < 3; j++)
 		{
 			output[i][j] = feat_world[3 * i + j];
-			cout<< output[i][j]<<"  ";
+			//cout<< output[i][j]<<"  ";
 		}
 		cout << endl;
 
 	}
-	//Py_DECREF(perms_adjs);
 
 }
 
  float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
 
-	 cout << "inside predict\n";
+	 clock_t start = clock();
 	 PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
 
 
@@ -315,12 +320,16 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 	}
 	vector<Tensor> outputs;
-
+	clock_t start0 = clock();
 	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
+	clock_t end0 = clock();
+	cout << "sess->Run time: " << end0 - start0 << endl;
 
 	auto output_c = outputs[0].flat<float>();
 	float*  output_test= (float*)(output_c.data());
 	out_size = output_c.size();
+	clock_t end = clock();
+	cout << "predict time: " << end - start << endl;
 
 
 	return output_test;

@@ -41,7 +41,9 @@ int main()
 	
 		clock_t end = clock();
 		cout << i << "  th run time is: " <<end - start << endl<<endl;
-	}
+}
+
+
 
 	getchar();
 

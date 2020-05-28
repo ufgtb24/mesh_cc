@@ -64,12 +64,12 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 	pFunc_Coarsen = PyObject_GetAttrString(pModule, "multi_coarsen");//multi_coarsen
 	if (pFunc_Coarsen == nullptr)
 		cout << "no pFunc_Coarsen is load"<<endl;
-	pFunc_Normal = PyObject_GetAttrString(pModule, "normalize");//multi_coarsen
+	pFunc_Normal = PyObject_GetAttrString(pModule, "normalize");
 	if (pFunc_Normal == nullptr)
 		cout << "no pFunc_Normal is load" << endl;
 
 	if (usage == Usage::FEAT) {
-	   pFunc_iNormal = PyObject_GetAttrString(pModule, "ivs_normalize");//multi_coarsen
+	   pFunc_iNormal = PyObject_GetAttrString(pModule, "ivs_normalize");
 	   if (pFunc_iNormal == nullptr)
 		   cout << "no pFunc_iNormal is load" << endl;
 

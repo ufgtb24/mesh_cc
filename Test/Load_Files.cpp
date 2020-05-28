@@ -34,7 +34,7 @@ int load_file(string file_name, int* adj, int K) {
 	}
 	return i;
 }
-int load_file(string file_name, float* adj, int K) {
+int load_file(string file_name, float* x, int K) {
 	ifstream Input2(file_name);
 	const int LINE_LENGTH = 100;
 	char str[LINE_LENGTH];
@@ -56,14 +56,14 @@ int load_file(string file_name, float* adj, int K) {
 		while (string::npos != pos2)
 		{
 			//v.push_back(s.substr(pos1, pos2 - pos1));
-			adj[i * K + j] = atof(s.substr(pos1, pos2 - pos1).c_str());
+			x[i * K + j] = atof(s.substr(pos1, pos2 - pos1).c_str());
 			j++;
 			pos1 = pos2 + c.size();
 			pos2 = s.find(c, pos1);
 		}
 		if (pos1 != s.length())
 			//v.push_back(s.substr(pos1));
-			adj[i * K + j] = atof(s.substr(pos1).c_str());
+			x[i * K + j] = atof(s.substr(pos1).c_str());
 		i++;
 	}
 	return i;

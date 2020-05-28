@@ -6,9 +6,9 @@
 
 
 
-int main()
+int main0()
 {
-	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\output_graph.pb";
+	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\orientation.pb";
 	string python_path = "D:/Python";
 	int coarsen_times = 3;
 	int coarsen_level = 3;

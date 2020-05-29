@@ -458,11 +458,11 @@ def normalize(world_coord,part_id):
 
 def ivs_normalize(local_coord,center,part_id):
     if part_id == 1:
-        local_coord = local_coord * [-1, 1, 1]
+        local_coord = local_coord * np.array([-1, 1, 1],dtype=np.float32)
     elif part_id == 2:
-        local_coord = local_coord * [1, -1, 1]
+        local_coord = local_coord * np.array([1, -1, 1],dtype=np.float32)
     elif part_id == 3:
-        local_coord = local_coord * [-1, -1, 1]
+        local_coord = local_coord * np.array([-1, -1, 1],dtype=np.float32)
     world_coord = local_coord + center
     return [world_coord.astype(np.float32)]
     

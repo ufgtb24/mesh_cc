@@ -44,7 +44,6 @@ private:
 	PyObject* pFunc_Normal;
 	PyObject* pFunc_iNormal;
 	unique_ptr<Session> sess;
-	vector<PyObject*> p_objs;
 	//vector<PyArrayObject*> a_objs;
 	const int c_times;
 	const int c_level;

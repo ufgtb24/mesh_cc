@@ -445,11 +445,17 @@ def normalize(world_coord,part_id):
     :param vtype: 0DL   1DR   2UL   3 UR
     :return:
     '''
-    print(world_coord.shape)
     center = np.mean(world_coord, axis=0)
 
     local_coord = world_coord - center
-    if part_id == 1:
+    if part_id==0:
+        #print(local_coord)
+        #local_coord = (local_coord * [1, 1, 1]).astype(np.float32)
+        local_coord = local_coord * [1, 1, 1]
+        #print('===========\n===========\n===========\n==========')
+        #print(local_coord)
+        #local_coord = local_coord
+    elif part_id == 1:
         local_coord = local_coord * [-1, 1, 1]
     elif part_id == 2:
         local_coord = local_coord * [1, -1, 1]
@@ -458,12 +464,22 @@ def normalize(world_coord,part_id):
     return [local_coord.astype(np.float32),center]
 
 def ivs_normalize(local_coord,center,part_id):
-    if part_id == 1:
-        local_coord = local_coord * [-1, 1, 1]
+    if part_id==0:
+        #print(local_coord.shape)
+        #print(local_coord)
+
+        #local_coord = (local_coord * [1, 1, 1]).astype(np.float64)
+        local_coord = local_coord * np.array([1, 1, 1],dtype=np.float32)
+        #print('===========\n===========\n===========\n==========')
+        #print(local_coord)
+
+        #local_coord = local_coord
+    elif part_id == 1:
+        local_coord = local_coord * np.array([-1, 1, 1],dtype=np.float32)
     elif part_id == 2:
-        local_coord = local_coord * [1, -1, 1]
+        local_coord = local_coord * np.array([1, -1, 1],dtype=np.float32)
     elif part_id == 3:
-        local_coord = local_coord * [-1, -1, 1]
+        local_coord = local_coord * np.array([-1, -1, 1],dtype=np.float32)
     world_coord = local_coord + center
     return [world_coord.astype(np.float32)]
 

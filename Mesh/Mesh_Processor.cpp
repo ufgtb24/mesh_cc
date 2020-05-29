@@ -42,7 +42,6 @@ int Mesh_Processor::init_numpy() {//初始化 numpy 执行环境，主要是导入包，python2
 
 void Mesh_Processor::init_python(string python_path, string script_name,Usage usage)
 {
-	clock_t start = clock();
 
 	Py_SetPythonHome(GetWC(python_path));
 	Py_Initialize();
@@ -78,14 +77,11 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 		   cout << "no pFunc_iNormal is load" << endl;
 
 	}
-	clock_t end = clock();
-	cout << "init_python time: " << end - start << endl;
 
 }
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 	unique_ptr<Session>* session,bool use_GPU) {
-	clock_t start = clock();
 	GraphDef graph_def;
 	Status load_graph_status =
 		ReadBinaryProto(Env::Default(), graph_file_name, &graph_def);
@@ -105,16 +101,6 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 		config->set_allow_soft_placement(true);
 		session->reset(NewSession(options));
 
-	//}
-	///////////
-	//else {
-
-	//	SessionOptions session_options;
-	//	_putenv("CUDA_VISIBLE_DEVICES=""");
-	//	session_options.config.mutable_gpu_options()->set_allow_growth(true);
-	//	session->reset(NewSession(session_options));
-	//}
-
 
 	Status session_create_status = (*session)->Create(graph_def);
 	if (!session_create_status.ok()) {
@@ -122,8 +108,6 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 
 		return session_create_status;
 	}
-	clock_t end = clock();
-	cout << "LoadGraph time: " << end - start << endl;
 
 	return Status::OK();
 }
@@ -142,8 +126,6 @@ float Mesh_Processor::get_loss(const char* label_path,int f_num,float* predict)
 	PyArrayObject* loss_np = (PyArrayObject*)PyList_GetItem(FuncOneBack, 0);
 	//cout<< *(float*)(loss_np->data)<<endl;
 	float loss = *(float*)(loss_np->data);
-	//Py_DECREF(FuncOneBack);
-	//Py_DECREF(loss_np);
 	return loss;
 
 
@@ -151,7 +133,6 @@ float Mesh_Processor::get_loss(const char* label_path,int f_num,float* predict)
 }
 PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 {
-	clock_t start = clock();
 	npy_intp Dims[2] = { pt_num, init_K };
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
@@ -163,14 +144,6 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
 
-	p_objs.push_back(Adj);
-	p_objs.push_back(ArgArray);
-
-	//Py_DECREF(Adj);
-	//Py_DECREF(ArgArray);
-
-	clock_t end = clock();
-	cout << "coarsen time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -178,23 +151,16 @@ PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
 
 PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 {
-	clock_t start = clock();
 
 	npy_intp Dims[2] = { pt_num, 3 };
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
 	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
-	p_objs.push_back(X);
 	PyObject* ArgArray = PyTuple_New(2);
-	p_objs.push_back(ArgArray);
 	PyTuple_SetItem(ArgArray, 0, X);
 	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
-	//Py_DECREF(X);
-	//Py_DECREF(ArgArray);
-	clock_t end = clock();
-	cout << "normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -204,18 +170,14 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 
 PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int feature_num,int part_id)
 {
-	clock_t start = clock();
 
 	npy_intp Dims_f[2] = { feature_num, 3 };
 	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
-	p_objs.push_back(F);
 	npy_intp Dims_c[1] = { 3 };
 	PyObject* C = PyArray_SimpleNewFromData(1, Dims_c, NPY_FLOAT, center);
-	p_objs.push_back(C);
 
 
 	PyObject* ArgArray = PyTuple_New(3);
-	p_objs.push_back(ArgArray);
 
 	PyTuple_SetItem(ArgArray, 0, F);
 	PyTuple_SetItem(ArgArray, 1, C);
@@ -223,8 +185,6 @@ PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int featur
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
 
-	clock_t end = clock();
-	cout << "ivs_normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -238,7 +198,6 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 
 void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_num, int init_K, float** output)
 {
-	cout << "inside predict_orientation\n";
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, 0);
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
 	//Py_DECREF(vertice_center);
@@ -255,7 +214,6 @@ void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_nu
 			output[i][j] = output_tmp[3*i+j];
 		}
 	}
-	//Py_DECREF(perms_adjs);
 
 }
 
@@ -264,39 +222,28 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 {
 
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, part_id);
-	p_objs.push_back(vertice_center);
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
-	p_objs.push_back((PyObject*)vertice_np);
 	PyArrayObject* center_np = (PyArrayObject*)PyList_GetItem(vertice_center, 1);//TODO delete perm
-	p_objs.push_back((PyObject*)center_np);
 
 	int ouput_size;
 	float* feat_local =predict((float*)(vertice_np->data), adj, pt_num, init_K, ouput_size);
 	int feat_num = ouput_size / 3;
-	cout << "output feature num = " << feat_num << endl;
 
 
 	PyObject* outputList=ivs_normalize(feat_local, (float*)(center_np->data), feat_num, part_id);
-	p_objs.push_back(outputList);
 	PyArrayObject* feat_np = (PyArrayObject*)PyList_GetItem(outputList, 0);
-	p_objs.push_back((PyObject*)feat_np);
 	float* feat_world= (float*)(feat_np->data);
 	for (int i = 0; i < feat_num * 3; i++) {
 		output[i] = feat_world[i];
 	}
 
-	//for (int i = 0; i < p_objs.size(); i++)
-	//	Py_DECREF(p_objs[i]);
-	//p_objs.clear();
 
 }
 
  float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
-	 cout << "predict\n";
 
 	 clock_t start = clock();
 	 PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
-	 p_objs.push_back(perms_adjs);
 
 	//int* imNumPt = new int(1);
 	vector<pair<string, Tensor>> inputs;
@@ -319,7 +266,6 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 	for (int i = 0; i < c_times; i++) {
 		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete perm
-		p_objs.push_back((PyObject*)perm);
 
 		const int64_t perm_dims[1] = { perm->dimensions[0] };
 
@@ -342,7 +288,6 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 	for (int i = c_times; i < 2 * c_times + 1; i++) {
 		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete adj
-		p_objs.push_back((PyObject*)adj);
 
 		const int64_t adj_dims[2] = { adj->dimensions[0],adj->dimensions[1] };
 
@@ -362,20 +307,15 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 	}
 	vector<Tensor> outputs;
-	clock_t start0 = clock();
 	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
 	if (!status.ok())
 	{
 		cout << "Error: " << status.ToString() << endl;
 	}
-	clock_t end0 = clock();
-	cout << "sess->Run time: " << end0 - start0 << endl;
 
 	auto output_c = outputs[0].flat<float>();
 	float*  output_test= (float*)(output_c.data());
 	out_size = output_c.size();
-	clock_t end = clock();
-	cout << "predict time: " << end - start << endl;
 
 
 	return output_test;

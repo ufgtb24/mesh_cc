@@ -445,6 +445,7 @@ def normalize(world_coord,part_id):
     :param vtype: 0DL   1DR   2UL   3 UR
     :return:
     '''
+    print(world_coord.shape)
     center = np.mean(world_coord, axis=0)
 
     local_coord = world_coord - center
@@ -465,5 +466,27 @@ def ivs_normalize(local_coord,center,part_id):
         local_coord = local_coord * [-1, -1, 1]
     world_coord = local_coord + center
     return [world_coord.astype(np.float32)]
+
+
+def parse_feature(feature_file):
+    feat= []
+    with open(feature_file)as f:
+        line = f.readline()
+        feat_list = line.split(',')[:-1]
+        for i,feat3d in enumerate(feat_list[1:]):
+            feat3d_array = np.array(list(map(float, feat3d.split())))
+            feat_coord = feat3d_array[1:]
+            feat.append(feat_coord)
+    feat_arr=np.array(feat)
+    return feat_arr
+
+
+def loss_debug(pred,label_path):
+    label=parse_feature(label_path)
+    loss=np.mean(np.sum(np.square(label-pred),axis=-1))
+    #print(loss)
+    return [np.array(loss).astype(np.float32)]
+
+
     
 

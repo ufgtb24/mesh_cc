@@ -38,6 +38,7 @@ int main()
 
 	float output[feature_num*3];
 	int exceed = 0;
+	float sum = 0;
 	for (int t = 0; t < 100; t++)
 	{
 
@@ -45,6 +46,7 @@ int main()
 
 
 		float loss=mp->get_loss(label_path, feature_num, output);
+		sum += loss;
 		cout <<t <<"    "<<loss<< endl;
 		if (loss > 2) {
 			for (int i = 0; i < feature_num * 3; i++)
@@ -56,8 +58,8 @@ int main()
 
 	}
 
-	cout << "exceed time = "<<exceed << endl;
-
+	cout << "exceed times = "<<exceed << endl;
+	cout << sum / 100;
 	getchar();
 
 	return 0;

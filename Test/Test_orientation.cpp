@@ -17,10 +17,10 @@ int main0()
 
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
-	int actual_pt_num = load_file("E:\\VS_Projects\\Mesh\\Test\\adj_o.txt", adj, K);
+	int actual_pt_num = load_file("F:/ProjectData/mesh_direction/Case_root/2aitest/low/20180402Dumore 1/adj.txt", adj, K);
 
 	float* x = new float[pt_num * 3];
-	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_o.txt", x, 3);
+	load_file("F:/ProjectData/mesh_direction/Case_root/2aitest/low/20180402Dumore 1/x.txt", x, 3);
 
 	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::ORIEN, false, python_path, "coarsening",
 		coarsen_times, coarsen_level);

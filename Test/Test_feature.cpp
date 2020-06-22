@@ -41,19 +41,21 @@ int main()
 	float sum = 0;
 	for (int t = 0; t < 100; t++)
 	{
+		clock_t start = clock();
 
 		mp->predict_feature(x, adj, actual_pt_num, 13, Mesh_Processor::RU, output);
+		clock_t end = clock();
+		cout <<t<<"    "<< end - start << endl;
 
-
-		float loss=mp->get_loss(label_path, feature_num, output);
-		sum += loss;
-		cout <<t <<"    "<<loss<< endl;
-		if (loss > 2) {
-			for (int i = 0; i < feature_num * 3; i++)
-				cout << output[i] << "  ";
-			cout << endl;
-			exceed++;
-		}
+		//float loss=mp->get_loss(label_path, feature_num, output);
+		//sum += loss;
+		//cout <<t <<"    "<<loss<< endl;
+		//if (loss > 2) {
+		//	for (int i = 0; i < feature_num * 3; i++)
+		//		cout << output[i] << "  ";
+		//	cout << endl;
+		//	exceed++;
+		//}
 		//getchar();
 
 	}

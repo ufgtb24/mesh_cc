@@ -22,8 +22,8 @@ int main0()
 	float* x = new float[pt_num * 3];
 	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_o.txt", x, 3);
 
-	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::ORIEN, false, python_path, "coarsening",
-		coarsen_times, coarsen_level);
+	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::ORIEN, false, python_path, "coarsening"
+		);
 
 
 

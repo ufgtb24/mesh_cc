@@ -4,8 +4,7 @@
 #include <numpy/arrayobject.h>
 #include <time.h>
 Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, string python_path,
-	string script_name, int coarsen_times, int coarsen_level):
-	c_times(coarsen_times), c_level(coarsen_level)
+	string script_name)
 
 {
 	
@@ -22,7 +21,6 @@ Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, str
 }
 Mesh_Processor::~Mesh_Processor()
 {
-	Py_DECREF(pFunc_Coarsen);
 
 }
 wchar_t* Mesh_Processor::GetWC(string str)
@@ -61,9 +59,6 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
 	//Python中的返回数据一定要显式指定类型为32bit，因为默认是64bit，而
 	//C++ 中，即使是64位机器 float 和 int 也是32 位的！！！！！！
-	pFunc_Coarsen = PyObject_GetAttrString(pModule, "multi_coarsen");//multi_coarsen
-	if (pFunc_Coarsen == nullptr)
-		cout << "no pFunc_Coarsen is load"<<endl;
 	pFunc_Normal = PyObject_GetAttrString(pModule, "normalize");
 	if (pFunc_Normal == nullptr)
 		cout << "no pFunc_Normal is load" << endl;
@@ -124,28 +119,6 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 	return Status::OK();
 }
 
-PyObject* Mesh_Processor::coarsen(int* adj, int pt_num,int init_K)
-{
-	clock_t start = clock();
-	npy_intp Dims[2] = { pt_num, init_K };
-
-	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
-	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims, NPY_INT, adj);
-	PyObject* ArgArray = PyTuple_New(3);
-	PyTuple_SetItem(ArgArray, 0, Adj);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", c_times));
-	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_level));
-
-	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
-
-	Py_DECREF(Adj);
-	Py_DECREF(ArgArray);
-
-	clock_t end = clock();
-	cout << "coarsen time: " << end - start << endl;
-
-	return FuncOneBack;
-}
 
 
 PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
@@ -256,8 +229,6 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
  float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
 
-	 clock_t start = clock();
-	 PyObject* perms_adjs = coarsen(adj, pt_num, init_K);
 
 
 	//int* imNumPt = new int(1);
@@ -267,58 +238,29 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 
 
 	const int64_t tensorDims[3] = { 1,pt_num ,3 };
-	TF_Tensor* tftensor = TF_NewTensor(TF_FLOAT, tensorDims, 3,
+	TF_Tensor* v_tensor = TF_NewTensor(TF_FLOAT, tensorDims, 3,
 		vertice, ((size_t)pt_num * 3) * sizeof(float),
 		DeallocateTensor, NULL);
 
 
-	Tensor vertice_tensor = TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
+	Tensor vertice_tensor = TensorCApi::MakeTensor(v_tensor->dtype, v_tensor->shape, v_tensor->buffer);
 	inputs.push_back({ "vertice",vertice_tensor });
 	input_names.push_back("vertice");
 
 
-	int perm_idx = 0;
 
-	for (int i = 0; i < c_times; i++) {
-		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete perm
 
-		const int64_t perm_dims[1] = { perm->dimensions[0] };
+	const int64_t tensorDims2[2] = { pt_num ,init_K };
+	TF_Tensor* a_tensor = TF_NewTensor(TF_INT32, tensorDims2, 2,
+		adj, ((size_t)pt_num * init_K) * sizeof(int),
+		DeallocateTensor, NULL);
 
-		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, perm_dims, 1,
-			(int*)(perm->data), (perm->dimensions[0]) * sizeof(int),
-			DeallocateTensor, NULL);
 
-		Tensor perm_tensor = TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
+	Tensor adj_tensor = TensorCApi::MakeTensor(a_tensor->dtype, a_tensor->shape, a_tensor->buffer);
+	inputs.push_back({ "adj",adj_tensor });
+	input_names.push_back("adj");
 
-		ostringstream ostr;
-		ostr << "perm_" << perm_idx++;
-		string node_name = ostr.str();
 
-		inputs.push_back({ node_name,perm_tensor });
-		input_names.push_back(node_name);
-
-	}
-	int adj_idx = 0;
-
-	for (int i = c_times; i < 2 * c_times + 1; i++) {
-		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete adj
-
-		const int64_t adj_dims[2] = { adj->dimensions[0],adj->dimensions[1] };
-
-		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, adj_dims, 2,
-			(int*)(adj->data), (adj->dimensions[0] * adj->dimensions[1]) * sizeof(int),
-			DeallocateTensor, NULL);
-
-		Tensor adj_tensor = TensorCApi::MakeTensor(tftensor->dtype, tftensor->shape, tftensor->buffer);
-
-		ostringstream ostr;
-		ostr << "adj_" << adj_idx++;
-		string node_name = ostr.str();
-
-		inputs.push_back({ node_name,adj_tensor });
-		input_names.push_back(node_name);
-
-	}
 	vector<Tensor> outputs;
 	clock_t start0 = clock();
 	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
@@ -328,8 +270,6 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 	auto output_c = outputs[0].flat<float>();
 	float*  output_test= (float*)(output_c.data());
 	out_size = output_c.size();
-	clock_t end = clock();
-	cout << "predict time: " << end - start << endl;
 
 
 	return output_test;

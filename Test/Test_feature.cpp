@@ -11,7 +11,7 @@
 
 int main()
 {
-	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\feature_back_res.pb";
+	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\feature_incisor.pb";
 	string python_path = "D:/Python";
 	int coarsen_times = 2;
 	int coarsen_level = 3;
@@ -20,13 +20,16 @@ int main()
 
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
-	int actual_pt_num = load_file("E:\\VS_Projects\\Mesh\\Test\\adj_f.txt", adj, K);
+	int actual_pt_num = load_file(
+		"F:/ProjectData/mesh_feature/Case_root/Case0421_1/up/YasukoYAMADAU 00/UpArchR/tooth7/adj.txt", 
+		adj, K);
 
 	float* x = new float[pt_num * 3];
-	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_f.txt", x, 3);
+	load_file(
+		"F:/ProjectData/mesh_feature/Case_root/Case0421_1/up/YasukoYAMADAU 00/UpArchR/tooth7/vertice.txt",
+		x, 3);
 
-	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::FEAT, false, python_path, "coarsening",
-		coarsen_times, coarsen_level);
+	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::FEAT, false, python_path, "coarsening");
 
 
 

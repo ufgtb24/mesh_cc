@@ -6,7 +6,7 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\orientation.pb";
 	string python_path = "D:/Python";
@@ -22,8 +22,8 @@ int main0()
 	float* x = new float[pt_num * 3];
 	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_o.txt", x, 3);
 
-	Feature_Processor* mp = new Feature_Processor(graph_path, Feature_Processor::ORIEN, false, python_path, "coarsening"
-		);
+	Orientation_Processor* mp = new Orientation_Processor(graph_path, false, python_path, "coarsening",
+		coarsen_times, coarsen_level);
 
 
 
@@ -32,7 +32,7 @@ int main0()
 		output[i] = new float[4];
 	}
 
-	mp->predict_orientation(x, adj, actual_pt_num, 13, output);
+	mp->predict(x, adj, actual_pt_num, 13, output);
 
 
 	for (int i = 0; i < 4; i++) {

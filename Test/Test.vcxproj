@@ -93,7 +93,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\TensorFlowCplusplus\TeethDetect\TeethDetect;E:\VS_Projects\Mesh\Mesh</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\VS_Projects\Mesh\Mesh</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

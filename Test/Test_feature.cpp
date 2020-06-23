@@ -29,7 +29,7 @@ int main()
 		"F:/ProjectData/mesh_feature/Case_root/Case0421_1/up/YasukoYAMADAU 00/UpArchR/tooth7/vertice.txt",
 		x, 3);
 
-	Mesh_Processor* mp = new Mesh_Processor(graph_path, Mesh_Processor::FEAT, false, python_path, "coarsening");
+	Feature_Processor* mp = new Feature_Processor(graph_path, Feature_Processor::FEAT, false, python_path, "coarsening");
 
 
 
@@ -40,7 +40,7 @@ int main()
 	for (int i = 0; i < 5; i++) {
 		clock_t start = clock();
 
-		mp->predict_feature(x, adj, actual_pt_num, 13, Mesh_Processor::LU, output);
+		mp->predict_feature(x, adj, actual_pt_num, 13, Feature_Processor::LU, output);
 	
 		clock_t end = clock();
 		cout << i << "  th run time is: " <<end - start << endl<<endl;

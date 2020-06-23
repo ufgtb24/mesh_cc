@@ -3,7 +3,7 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <time.h>
-Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, string python_path,
+Feature_Processor::Feature_Processor(string graph_path, Usage usage, bool use_GPU, string python_path,
 	string script_name)
 
 {
@@ -19,11 +19,11 @@ Mesh_Processor::Mesh_Processor(string graph_path, Usage usage, bool use_GPU, str
 	}
 
 }
-Mesh_Processor::~Mesh_Processor()
+Feature_Processor::~Feature_Processor()
 {
 
 }
-wchar_t* Mesh_Processor::GetWC(string str)
+wchar_t* Feature_Processor::GetWC(string str)
 {
 	const char* c = str.c_str();
 	const size_t cSize = strlen(c) + 1;
@@ -33,12 +33,12 @@ wchar_t* Mesh_Processor::GetWC(string str)
 
 	return wc;
 }
-int Mesh_Processor::init_numpy() {//初始化 numpy 执行环境，主要是导入包，python2.7用void返回类型，python3.0以上用int返回类型
+int Feature_Processor::init_numpy() {//初始化 numpy 执行环境，主要是导入包，python2.7用void返回类型，python3.0以上用int返回类型
 
 	import_array();
 }
 
-void Mesh_Processor::init_python(string python_path, string script_name,Usage usage)
+void Feature_Processor::init_python(string python_path, string script_name,Usage usage)
 {
 	clock_t start = clock();
 
@@ -74,7 +74,7 @@ void Mesh_Processor::init_python(string python_path, string script_name,Usage us
 
 }
 
-Status Mesh_Processor::LoadGraph(const string& graph_file_name,
+Status Feature_Processor::LoadGraph(const string& graph_file_name,
 	unique_ptr<Session>* session,bool use_GPU) {
 	clock_t start = clock();
 	GraphDef graph_def;
@@ -121,9 +121,8 @@ Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 
 
 
-PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
+PyObject* Feature_Processor::normalize(float* x, int pt_num, int part_id)
 {
-	clock_t start = clock();
 
 	npy_intp Dims[2] = { pt_num, 3 };
 
@@ -135,15 +134,12 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, int part_id)
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
 
-	clock_t end = clock();
-	cout << "normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
 
-PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int feature_num,int part_id)
+PyObject* Feature_Processor::ivs_normalize(float* feature, float* center,int feature_num,int part_id)
 {
-	clock_t start = clock();
 
 	npy_intp Dims_f[2] = { feature_num, 3 };
 	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
@@ -159,8 +155,6 @@ PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center,int featur
 	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", part_id));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
-	clock_t end = clock();
-	cout << "ivs_normalize time: " << end - start << endl;
 
 	return FuncOneBack;
 }
@@ -172,7 +166,7 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 
 
 
-void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_num, int init_K, float** output)
+void Feature_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_num, int init_K, float** output)
 {
 	cout << "inside predict_orientation\n";
 	PyObject* vertice_center = normalize(vertice_ori, pt_num, 0);
@@ -195,7 +189,7 @@ void Mesh_Processor::predict_orientation(float* vertice_ori, int* adj, int pt_nu
 
 }
 
-void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num, 
+void Feature_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num, 
 	int init_K, PartID part_id, float** output)
 {
 
@@ -221,13 +215,13 @@ void Mesh_Processor::predict_feature(float* vertice_ori, int* adj, int pt_num,
 			output[i][j] = feat_world[3 * i + j];
 			//cout<< output[i][j]<<"  ";
 		}
-		cout << endl;
+		//cout << endl;
 
 	}
 
 }
 
- float* Mesh_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
+ float* Feature_Processor::predict(float* vertice, int* adj, int pt_num, int init_K,int& out_size) {
 
 
 

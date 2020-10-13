@@ -4,10 +4,10 @@
 #include <numpy/arrayobject.h>
 #include <time.h>
 
-Mesh_Processor::Mesh_Processor(string graph_path,bool use_GPU)
+Mesh_Processor::Mesh_Processor(string graph_path)
 
 {
-	Status load_graph_status = LoadGraph(graph_path, &sess, use_GPU);
+	Status load_graph_status = LoadGraph(graph_path, &sess);
 	if (!load_graph_status.ok()) {
 		LOG(ERROR) << "\n!!!!!load_graph_status!!!!!\n";
 		LOG(ERROR) << load_graph_status;
@@ -32,7 +32,7 @@ wchar_t* Mesh_Processor::GetWC(string str)
 }
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
-	unique_ptr<Session>* session, bool use_GPU) {
+	unique_ptr<Session>* session) {
 	clock_t start = clock();
 	GraphDef graph_def;
 	Status load_graph_status =

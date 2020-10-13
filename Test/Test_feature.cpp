@@ -9,26 +9,26 @@
 
 int main()
 {
-	string graph_path = "E:/VS_Projects/Mesh/Test/feature_incisor.pb";
+	string graph_path = "E:/VS_Projects/Mesh/Test/feature_premollar.pb";
 	string python_path = "D:/Python";
 	const int pt_num = 2000;
-	const int K = 13; // 需要调整
-	const int feat_num = 4;
+	const int K = 15; // 需要调整
+	const int feat_num = 6;  //需要调整
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
 	int actual_pt_num = load_file(
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/TestPatientL 00/DownArchR/tooth7/adj.txt", 
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/adj.txt", 
 		adj, K);
 
 	float* x = new float[pt_num * 3];
 	load_file(
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/TestPatientL 00/DownArchR/tooth7/vertice.txt",
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/vertice.txt",
 		x, 3);
 
-	Feature_Processor* mp = new Feature_Processor(graph_path, false, python_path, "coarsening");
+	Feature_Processor* mp = new Feature_Processor(graph_path, python_path, "coarsening");
 
 	const char label_path[] =
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/TestPatientL 00/DownArchR/tooth7/feature.txt";
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/feature.txt";
 
 
 	float** output = new float* [feat_num];
@@ -39,21 +39,22 @@ int main()
 
 	float output_loss[feat_num * 3];
 
-	//for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 5; i++) {
 		clock_t start = clock();
 
-		mp->predict(x, adj, actual_pt_num, K, Feature_Processor::RD, output);
+		mp->predict(x, adj, actual_pt_num, K, Feature_Processor::LD, output);
 
 
-#if defined(DEBUG)
 
 		for (int m = 0; m < feat_num; m++) {
 			for (int n = 0; n < 3; n++) {
 				output_loss[3*m+n] = output[m][n];
-				cout << output[m][n] << "  ";
+				//cout << output[m][n] << "  ";
 			}
 			cout << endl;
 		}
+#if defined(AI_DEBUG)
+
 		float loss = mp->get_loss(label_path, feat_num, output_loss);
 		cout << "loss =" << loss << endl;
 #endif
@@ -61,8 +62,8 @@ int main()
 		clock_t end = clock();
 
 
-		//cout << i << "  th run time is: " <<end - start << endl<<endl;
-//}
+		cout << i << "  th run time is: " <<end - start << endl<<endl;
+}
 
 
 

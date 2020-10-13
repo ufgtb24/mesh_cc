@@ -16,8 +16,7 @@ def coarsen(A,levels, biased):
 
     A_out, parents = metis(A, levels,biased) # 3 graphs   2 parents
     # 根据最顶层id升序，返回自底向上的id二叉树，二叉树的结构定义了层间连接关系
-    perms = compute_perm(parents)  # 3 perms
-    perm_in=np.array(perms[0])
+    perm_in, fwd_map = compute_perm(parents)  # 3 perms
 
     # if not self_connections:
     #     A_out = A_out.tocoo()
@@ -25,7 +24,7 @@ def coarsen(A,levels, biased):
     
 
 
-    return perm_in, A_out
+    return perm_in, A_out,fwd_map
 
 def newadj(adj_path):
     path=adj_path.split('.')[0]
@@ -39,7 +38,7 @@ def newadj(adj_path):
     return new_path
     
     
-def multi_coarsen(adj, coarsen_times, coarsen_level):
+def multi_coarsen(adj,coarsen_times, coarsen_level):
     '''
 
     :param adj_path:
@@ -56,6 +55,7 @@ def multi_coarsen(adj, coarsen_times, coarsen_level):
     # adj=np.concatenate([adj,np.zeros([adj.shape[0],adj_len-adj.shape[1]],dtype=np.int32)],axis=1)
     perms = []
     adjs = []
+    pool_maps=[]
     adjs.append(adj) # adj 比 perm  多一个
     for i in range(coarsen_times):
         if i==0:
@@ -74,12 +74,14 @@ def multi_coarsen(adj, coarsen_times, coarsen_level):
             A_in=A_out
             biased=True
         # is_symm, sub = is_Symm(A_in)
-        perm_in, A_out = coarsen(A_in, coarsen_level,biased)
+        perm_in, A_out, fwd_map = coarsen(A_in, coarsen_level,biased)
         perms.append(perm_in)
         A_adj=A_out.copy()
         adj = A_to_adj(A_adj)
         adjs.append(adj)
-    return perms+adjs
+        pool_maps.append(fwd_map)
+
+    return perms+adjs+pool_maps
  
 def is_Symm(W):
     return (abs(W - W.T) > 0).nnz==0, abs(W - W.T)
@@ -250,6 +252,7 @@ def metis_one_level(rr,cc,vv,rid,weights):
 
     return cluster_id
 
+
 def compute_perm(parents):
     """
     Return a list of indices to reorder the adjacency and data matrices so
@@ -261,58 +264,59 @@ def compute_perm(parents):
     indices = []
     if len(parents) > 0:
         M_last = max(parents[-1]) + 1
-        indices.append(list(range(M_last))) # rank the cluster id of the last layer
-        #只有最后一层需要排序 indices=[0,1,2]
+        id_map = np.array(list(range(M_last)))  # rank the cluster id of the last layer
+        indices.append(list(range(M_last)))  # rank the cluster id of the last layer
+        # 只有最后一层需要排序 indices=[0,1,2]
 
     for parent in parents[::-1]:
         # from the coarsest level
-        #print('parent: {}'.format(parent))
+        # print('parent: {}'.format(parent))
 
         # Fake nodes go after real ones. len(parent) is the number of real node in this layer
         # add new id for fake nodes of this layer
+        id_map = id_map[parent]
+
         pool_singeltons = len(parent)
 
         indices_layer = []
         for i in indices[-1]:
-            
+
             # 每个父节点对应一个 indices_node, 索引上一层中的子节点
             # index of where condition is true
             indices_node = list((np.where(parent == i)[0]).astype(np.int32))
-            
+
             assert 0 <= len(indices_node) <= 2
-            #print('indices_node: {}'.format(indices_node))
+            # print('indices_node: {}'.format(indices_node))
 
             # Add a node to go with a singelton.
             if len(indices_node) is 1:
                 # 本层是独生子
                 indices_node.append(pool_singeltons)
                 pool_singeltons += 1
-                #print('new singelton: {}'.format(indices_node))
+                # print('new singelton: {}'.format(indices_node))
             # Add two nodes as children of a singelton in the parent.
             elif len(indices_node) is 0:
                 # parent是fake point
-                indices_node.append(pool_singeltons+0)
-                indices_node.append(pool_singeltons+1)
+                indices_node.append(pool_singeltons + 0)
+                indices_node.append(pool_singeltons + 1)
                 pool_singeltons += 2
-                #print('singelton childrens: {}'.format(indices_node))
+                # print('singelton childrens: {}'.format(indices_node))
 
-            indices_layer.extend(indices_node) # 每次加两个元素：上一层的两个索引
+            indices_layer.extend(indices_node)  # 每次加两个元素：上一层的两个索引
         # 将根据indices[-1](coarser layer)节点顺序推导出的 indices_layer(finer layer)
         # 放入 indices。 因此 indices 中包含的由 coarser 到 finer 的层节点索引
         indices.append(indices_layer)
 
     # Sanity checks.
-    for i,indices_layer in enumerate(indices):
-        M = M_last*2**i
+    for i, indices_layer in enumerate(indices):
+        M = M_last * 2 ** i
         # Reduction by 2 at each layer (binary tree).
         assert len(indices_layer) == M
         # The new ordering does not omit an indice.
         assert sorted(indices_layer) == list(range(M))
 
-    return indices[::-1] # finest to coarsest
+    return np.array(indices[-1]), id_map  # finest to coarsest
 
-assert (compute_perm([np.array([4,1,1,2,2,3,0,0,3]),np.array([2,1,0,1,0])])
-        == [[3,4,0,9,1,2,5,8,6,7,10,11],[2,4,1,3,0,5],[0,1,2]])
 
 def perm_data(x, indices):
     """
@@ -449,11 +453,11 @@ def normalize(world_coord,part_id):
 
     local_coord = world_coord - center
     if part_id == 1:
-        local_coord = local_coord * [-1, 1, 1]
+        local_coord = local_coord * np.array([-1, 1, 1],dtype=np.float32)
     elif part_id == 2:
-        local_coord = local_coord * [1, -1, 1]
+        local_coord = local_coord * np.array([1, -1, 1],dtype=np.float32)
     elif part_id == 3:
-        local_coord = local_coord * [-1, -1, 1]
+        local_coord = local_coord * np.array([-1, -1, 1],dtype=np.float32)
     return [local_coord.astype(np.float32),center]
 
 def ivs_normalize(local_coord,center,part_id):

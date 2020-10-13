@@ -22,7 +22,7 @@ int main0()
 	float* x = new float[pt_num * 3];
 	load_file("E:\\VS_Projects\\Mesh\\Test\\vertice_o.txt", x, 3);
 
-	Orientation_Processor* mp = new Orientation_Processor(graph_path, false, python_path, "coarsening",
+	Orientation_Processor* mp = new Orientation_Processor(graph_path, python_path, "coarsening",
 		coarsen_times, coarsen_level);
 
 

@@ -4,9 +4,9 @@
 #include <numpy/arrayobject.h>
 #include <time.h>
 
-Orientation_Processor::Orientation_Processor(string graph_path, bool use_GPU, string python_path,
+Orientation_Processor::Orientation_Processor(string graph_path,  string python_path,
 	string script_name, int coarsen_times, int coarsen_level):c_times(coarsen_times), c_level(coarsen_level),
-	Mesh_Processor(graph_path, use_GPU)
+	Mesh_Processor(graph_path)
 {
 	init_python(python_path, script_name);
 

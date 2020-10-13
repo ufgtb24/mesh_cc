@@ -4,11 +4,14 @@
 #include <numpy/arrayobject.h>
 #include <time.h>
 Feature_Processor::Feature_Processor(string graph_path, string python_path,
-	string script_name):Mesh_Processor(graph_path)
+	string script_name, int coasen_times,int coarsen_levels[]):Mesh_Processor(graph_path)
 
 {
 	init_python(python_path, script_name);
-
+	c_times = coasen_times;
+	for (int i = 0; i < coasen_times; i++) {
+		c_levels[i] = coarsen_levels[i];
+	}
 }
 Feature_Processor::~Feature_Processor()
 {
@@ -73,10 +76,15 @@ PyObject* Feature_Processor::coarsen(int* adj, int pt_num, int init_K)
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
 	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims, NPY_INT, adj);
-	PyObject* ArgArray = PyTuple_New(3);
+	PyObject* ArgArray = PyTuple_New(2);
 	PyTuple_SetItem(ArgArray, 0, Adj);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", 2));
-	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", 1));
+
+	PyObject* array = PyList_New(c_times);
+	for(int i =0;i< c_times;i++)
+		PyList_SetItem(array, i, Py_BuildValue("i", c_levels[i]));
+
+
+	PyTuple_SetItem(ArgArray, 1, array);
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
 
@@ -181,7 +189,7 @@ float* Feature_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_a
 	Tensor vertice_tensor = TensorCApi::MakeTensor(v_tensor->dtype, v_tensor->shape, v_tensor->buffer);
 	inputs.push_back({ "vertice",vertice_tensor });
 	//////////////
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < c_times; i++) {
 		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perm_adj_map, i);//TODO delete perm
 
 		const int64_t perm_dims[1] = { perm->dimensions[0] };
@@ -201,8 +209,8 @@ float* Feature_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_a
 
 	}
 
-	for (int i = 0; i < 3 ; i++) {
-		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perm_adj_map, 2+i);//TODO delete adj
+	for (int i = 0; i < c_times+1; i++) {
+		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perm_adj_map, c_times +i);//TODO delete adj
 
 		const int64_t adj_dims[2] = { adj->dimensions[0],adj->dimensions[1] };
 
@@ -220,8 +228,8 @@ float* Feature_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_a
 
 
 	}
-	for (int i = 0; i < 2; i++) {
-		PyArrayObject* map = (PyArrayObject*)PyList_GetItem(perm_adj_map, 5+i);//TODO delete perm
+	for (int i = 0; i < c_times; i++) {
+		PyArrayObject* map = (PyArrayObject*)PyList_GetItem(perm_adj_map, 2* c_times +1+i);//TODO delete perm
 
 		const int64_t map_dims[1] = { map->dimensions[0] };
 

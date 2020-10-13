@@ -38,7 +38,7 @@ def newadj(adj_path):
     return new_path
     
     
-def multi_coarsen(adj,coarsen_times, coarsen_level):
+def multi_coarsen(adj,coarsen_levels):
     '''
 
     :param adj_path:
@@ -57,7 +57,7 @@ def multi_coarsen(adj,coarsen_times, coarsen_level):
     adjs = []
     pool_maps=[]
     adjs.append(adj) # adj 比 perm  多一个
-    for i in range(coarsen_times):
+    for i,coarsen_level in enumerate(coarsen_levels):
         if i==0:
             
             # 可以兼容adj截断的状况，不会越界，但是不再是对称矩阵

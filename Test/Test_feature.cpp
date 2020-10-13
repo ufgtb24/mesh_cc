@@ -17,18 +17,18 @@ int main()
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
 	int actual_pt_num = load_file(
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/adj.txt", 
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/DownArchL/tooth4/adj.txt", 
 		adj, K);
 
 	float* x = new float[pt_num * 3];
 	load_file(
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/vertice.txt",
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/DownArchL/tooth4/vertice.txt",
 		x, 3);
-
-	Feature_Processor* mp = new Feature_Processor(graph_path, python_path, "coarsening");
+	int c_levels[] = { 2,2,3,3 };
+	Feature_Processor* mp = new Feature_Processor(graph_path, python_path, "coarsening",4, c_levels);
 
 	const char label_path[] =
-		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/UpArchL/tooth4/feature.txt";
+		"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/DownArchL/tooth4/feature.txt";
 
 
 	float** output = new float* [feat_num];

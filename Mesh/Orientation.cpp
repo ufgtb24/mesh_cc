@@ -62,10 +62,18 @@ PyObject* Orientation_Processor::coarsen(int* adj, int pt_num, int init_K)
 
 	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
 	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims, NPY_INT, adj);
-	PyObject* ArgArray = PyTuple_New(3);
+	PyObject* ArgArray = PyTuple_New(2);
 	PyTuple_SetItem(ArgArray, 0, Adj);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", c_times));
-	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_level));
+
+	PyObject* array = PyList_New(c_times);
+	for (int i = 0; i < c_times; i++)
+		PyList_SetItem(array, i, Py_BuildValue("i", c_level));
+	PyTuple_SetItem(ArgArray, 1, array);
+
+
+
+	//PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", c_times));
+	//PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", c_level));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);
 

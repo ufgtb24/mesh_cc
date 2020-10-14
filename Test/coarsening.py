@@ -82,7 +82,8 @@ def multi_coarsen(adj,coarsen_levels):
         pool_maps.append(fwd_map)
 
     return perms+adjs+pool_maps
- 
+
+
 def is_Symm(W):
     return (abs(W - W.T) > 0).nnz==0, abs(W - W.T)
 

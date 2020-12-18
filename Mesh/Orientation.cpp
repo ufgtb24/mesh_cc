@@ -23,20 +23,8 @@ int Orientation_Processor::init_numpy()
 }
 void Orientation_Processor::init_python(string python_path, string script_name)
 {
-	clock_t start = clock();
-
-	Py_SetPythonHome(GetWC(python_path));
-	Py_Initialize();
+	PyObject* pModule = Mesh_Processor::init_python(python_path, script_name);
 	init_numpy();
-	PyRun_SimpleString("import sys,os");
-	//PyRun_SimpleString("sys.path.append('E:\\VS_Projects\\Mesh_Process\\Test')");
-	PyRun_SimpleString("sys.path.append('./')");
-	PyRun_SimpleString("print(os.getcwd())");
-	//pModule = PyImport_ImportModule("math_test");
-	PyObject* pModule = PyImport_ImportModule(script_name.c_str());//"coarsen"
-	if (pModule == nullptr)
-		cout << "no script is load";
-
 	//天坑！！！！！！！
 	//脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
 	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
@@ -48,9 +36,6 @@ void Orientation_Processor::init_python(string python_path, string script_name)
 	pFunc_Normal = PyObject_GetAttrString(pModule, "normalize");
 	if (pFunc_Normal == nullptr)
 		cout << "no pFunc_Normal is load" << endl;
-
-	clock_t end = clock();
-	cout << "init_python time: " << end - start << endl;
 
 }
 
@@ -87,25 +72,6 @@ PyObject* Orientation_Processor::coarsen(int* adj, int pt_num, int init_K)
 }
 
 
-PyObject* Orientation_Processor::normalize(float* x, int pt_num)
-{
-	clock_t start = clock();
-
-	npy_intp Dims[2] = { pt_num, 3 };
-
-	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
-	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
-	PyObject* ArgArray = PyTuple_New(2);
-	PyTuple_SetItem(ArgArray, 0, X);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", 0));
-
-	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
-
-	clock_t end = clock();
-	cout << "normalize time: " << end - start << endl;
-
-	return FuncOneBack;
-}
 
 
 static void DeallocateTensor(void* data, std::size_t, void*) {
@@ -118,7 +84,7 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 void Orientation_Processor::predict(float* vertice_ori, int* adj, int pt_num, int init_K, float** output)
 {
 	cout << "inside predict_orientation\n";
-	PyObject* vertice_center = normalize(vertice_ori, pt_num);
+	PyObject* vertice_center = normalize(vertice_ori, pt_num, PartID::LD);
 	PyArrayObject* vertice_np = (PyArrayObject*)PyList_GetItem(vertice_center, 0);//TODO delete perm
 
 	int output_size;

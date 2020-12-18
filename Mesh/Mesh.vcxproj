@@ -154,7 +154,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>E:\MyDLTools\tensorflow1.13.1\cpu;D:/Python\libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>tensorflow_cc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>tensorflow_cc.lib;python36.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -163,6 +163,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Area.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Feature.cpp" />
     <ClCompile Include="Mesh_Processor.cpp" />

@@ -4,6 +4,9 @@
 #include <numpy/arrayobject.h>
 #include <time.h>
 
+
+
+
 Mesh_Processor::Mesh_Processor(string graph_path)
 
 {
@@ -20,6 +23,32 @@ Mesh_Processor::~Mesh_Processor()
 {
 
 }
+
+
+PyObject* Mesh_Processor::init_python(string python_path, string script_name)
+{
+	clock_t start = clock();
+
+	Py_SetPythonHome(GetWC(python_path));
+	Py_Initialize();
+	init_numpy();
+	PyRun_SimpleString("import sys,os");
+	//PyRun_SimpleString("sys.path.append('E:\\VS_Projects\\Mesh_Process\\Test')");
+	PyRun_SimpleString("sys.path.append('./')");
+	PyRun_SimpleString("print(os.getcwd())");
+	//pModule = PyImport_ImportModule("math_test");
+	PyObject* pModule = PyImport_ImportModule(script_name.c_str());//"coarsen"
+	if (pModule == nullptr)
+		cout << "no script is load";
+	return pModule;
+}
+
+int Mesh_Processor::init_numpy()
+{
+	import_array();
+
+}
+
 wchar_t* Mesh_Processor::GetWC(string str)
 {
 	const char* c = str.c_str();
@@ -30,6 +59,48 @@ wchar_t* Mesh_Processor::GetWC(string str)
 
 	return wc;
 }
+
+PyObject* Mesh_Processor::normalize(float* x, int pt_num, PartID part_id)
+{
+	//init_numpy();
+
+	npy_intp Dims[2] = { pt_num, 3 };
+
+	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
+	PyObject* ArgArray = PyTuple_New(2);
+	PyTuple_SetItem(ArgArray, 0, X);
+	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
+
+	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
+
+	return FuncOneBack;
+}
+
+PyObject* Mesh_Processor::ivs_normalize(float* feature, float* center, int feature_num, PartID part_id)
+{
+
+	npy_intp Dims_f[2] = { feature_num, 3 };
+	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
+
+	npy_intp Dims_c[1] = { 3 };
+	PyObject* C = PyArray_SimpleNewFromData(1, Dims_c, NPY_FLOAT, center);
+
+
+
+	PyObject* ArgArray = PyTuple_New(3);
+	PyTuple_SetItem(ArgArray, 0, F);
+	PyTuple_SetItem(ArgArray, 1, C);
+	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", part_id));
+
+	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
+
+	return FuncOneBack;
+}
+
+static void DeallocateTensor(void* data, std::size_t, void*) {
+	//std::free(data);
+}
+
 
 Status Mesh_Processor::LoadGraph(const string& graph_file_name,
 	unique_ptr<Session>* session) {

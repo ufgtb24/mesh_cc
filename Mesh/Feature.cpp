@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <time.h>
+
 Feature_Processor::Feature_Processor(string graph_path, string python_path,
 	string script_name, int coasen_times,int coarsen_levels[]):Mesh_Processor(graph_path)
 
@@ -22,21 +23,15 @@ int Feature_Processor::init_numpy()
 	import_array();
 
 }
+
+static void DeallocateTensor(void* data, std::size_t, void*) {
+	//std::free(data);
+}
+
 void Feature_Processor::init_python(string python_path, string script_name)
 {
-	clock_t start = clock();
-	Py_SetPythonHome(GetWC(python_path));
-	Py_Initialize();
+	PyObject* pModule=Mesh_Processor::init_python(python_path, script_name);
 	init_numpy();
-	PyRun_SimpleString("import sys,os");
-	//PyRun_SimpleString("sys.path.append('E:\\VS_Projects\\Mesh_Process\\Test')");
-	PyRun_SimpleString("sys.path.append('./')");
-	PyRun_SimpleString("print(os.getcwd())");
-	//pModule = PyImport_ImportModule("math_test");
-	PyObject* pModule = PyImport_ImportModule(script_name.c_str());//"coarsen"
-	if (pModule == nullptr)
-		cout << "no script is load";
-
 	//天坑！！！！！！！
 	//脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
 	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
@@ -65,9 +60,6 @@ void Feature_Processor::init_python(string python_path, string script_name)
 		cout << "no pFunc_iNormal is load" << endl;
 
 	
-	clock_t end = clock();
-	cout << "init_python time: " << end - start << endl;
-
 }
 
 PyObject* Feature_Processor::coarsen(int* adj, int pt_num, int init_K)
@@ -94,46 +86,7 @@ PyObject* Feature_Processor::coarsen(int* adj, int pt_num, int init_K)
 
 
 
-PyObject* Feature_Processor::normalize(float* x, int pt_num, int part_id)
-{
 
-	npy_intp Dims[2] = { pt_num, 3 };
-
-	//PyObject* PyArray = PyArray_SimpleNewFromData(2, Dims, NPY_DOUBLE, CArrays);
-	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
-	PyObject* ArgArray = PyTuple_New(2);
-	PyTuple_SetItem(ArgArray, 0, X);
-	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
-
-	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
-
-	return FuncOneBack;
-}
-
-PyObject* Feature_Processor::ivs_normalize(float* feature, float* center, int feature_num, int part_id)
-{
-
-	npy_intp Dims_f[2] = { feature_num, 3 };
-	PyObject* F = PyArray_SimpleNewFromData(2, Dims_f, NPY_FLOAT, feature);
-
-	npy_intp Dims_c[1] = { 3 };
-	PyObject* C = PyArray_SimpleNewFromData(1, Dims_c, NPY_FLOAT, center);
-
-
-
-	PyObject* ArgArray = PyTuple_New(3);
-	PyTuple_SetItem(ArgArray, 0, F);
-	PyTuple_SetItem(ArgArray, 1, C);
-	PyTuple_SetItem(ArgArray, 2, Py_BuildValue("i", part_id));
-
-	PyObject* FuncOneBack = PyObject_CallObject(pFunc_iNormal, ArgArray);
-
-	return FuncOneBack;
-}
-
-static void DeallocateTensor(void* data, std::size_t, void*) {
-	//std::free(data);
-}
 
 
 

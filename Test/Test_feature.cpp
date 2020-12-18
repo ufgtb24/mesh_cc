@@ -7,7 +7,7 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:/VS_Projects/Mesh/Test/feature_premollar.pb";
 	string python_path = "D:/Python";
@@ -42,7 +42,7 @@ int main0()
 	for (int i = 0; i < 5; i++) {
 		clock_t start = clock();
 
-		mp->predict(x, adj, actual_pt_num, K, Feature_Processor::LD, output);
+		mp->predict(x, adj, actual_pt_num, K, PartID::LD, output);
 
 
 

@@ -6,7 +6,7 @@
 
 
 
-int main()
+int main0()
 {
 	string graph_path = "E:\\VS_Projects\\Mesh\\Test\\orientation.pb";
 	string python_path = "D:/Python";

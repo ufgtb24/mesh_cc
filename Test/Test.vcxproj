@@ -155,13 +155,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Load_Files.cpp" />
+    <ClCompile Include="Test_area.cpp" />
     <ClCompile Include="Test_orientation.cpp" />
     <ClCompile Include="Test_feature.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\TensorFlowCplusplus\TeethDetect\TeethDetect\TeethDetect_GPU.vcxproj">
-      <Project>{ff444cde-666f-449f-8f54-c2f9546240da}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\Mesh\Mesh.vcxproj">
       <Project>{01c3fa6d-164c-44fb-bc5e-a2319eda4e64}</Project>
     </ProjectReference>

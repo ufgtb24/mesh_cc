@@ -2,8 +2,153 @@ import numpy as np
 import scipy.sparse
 
 
+def compute_perm_decimate(parents):
+    """
+    Return a list of indices to reorder the adjacency and data matrices so
+    that the union of two neighbors from layer to layer forms a binary tree.
+    产生底层根据顶层排序，并加入fake_nodes后的排序，最底层会用于构建二叉树
+    """
+    
+    # Order of last layer is random (chosen by the clustering algorithm).
+    indices = []
+    if len(parents) > 0:
+        M_last = max(parents[-1]) + 1
+        indices.append(list(range(M_last)))  # rank the cluster id of the last layer
+        # 只有最后一层需要排序 indices=[0,1,2]
+    
+    # f: thiner level id --> final level id (in one coarsen time)
+    map_layer = indices[0]
+    
+    for parent in parents[::-1]:
+        # from the coarsest level
+        # print('parent: {}'.format(parent))
+        
+        # Fake nodes go after real ones. len(parent) is the number of real node in this layer
+        # add new id for fake nodes of this layer
+        
+        indices_layer = []
+        map_layer_parent = map_layer  # [0,1,2,3]: coarse-layer num
+        map_layer = [None] * len(parent)  # [None]* thin_layer_num
+        for i in indices[-1]:  # [0,1,2,3]: coarse-layer num
+            
+            # 每个父节点对应一个 indices_node, 索引上一层中的子节点
+            # index of where condition is true
+            indices_node = list((np.where(parent == i)[0]).astype(np.int32))
+            for idx in indices_node:
+                map_layer[idx] = map_layer_parent[i]
+            
+            assert 0 <= len(indices_node) <= 2
+            # print('indices_node: {}'.format(indices_node))
+            
+            # Add a node to go with a singelton.
+            if len(indices_node) is 1:
+                # 本层是独生子
+                indices_node.append(indices_node[0])
+                # print('new singelton: {}'.format(indices_node))
+            
+            indices_layer.extend(indices_node)  # 每次加两个元素：上一层的两个索引
+        
+        # 将根据indices[-1](coarser layer)节点顺序推导出的 indices_layer(finer layer)
+        # 放入 indices。 因此 indices 中包含的由 coarser 到 finer 的层节点索引
+        indices.append(indices_layer)
+    
+    # # Sanity checks.
+    # for i, indices_layer in enumerate(indices):
+    #     M = M_last * 2 ** i
+    #     # Reduction by 2 at each layer (binary tree).
+    #     assert len(indices_layer) == M
+    #     # The new ordering does not omit an indice.
+    #     assert sorted(indices_layer) == list(range(M))
+    
+    return indices[::-1], map_layer  # finest to coarsest
 
-def coarsen(A,levels, biased):
+
+def metis_to_num(W, target_num):
+    pt_num = W.shape[0]
+    
+    rid = np.random.permutation(range(W.shape[0]))
+    # rid = np.arange(N)  # 调试顺序
+    
+    degree = W.sum(axis=0) - W.diagonal()
+    parents = []
+    
+    while (pt_num > target_num):
+        # count += 1
+        
+        # CHOOSE THE WEIGHTS FOR THE PAIRING
+        # weights = ones(N,1)       # metis weights
+        weights = degree  # graclus weights [N]
+        # weights = supernode_size  # other possibility
+        weights = np.array(weights).squeeze()
+        
+        # check=is_Symm(W)
+        # PAIR THE VERTICES AND CONSTRUCT THE ROOT VECTOR
+        # column-major order  row_idx  col_idx   val_idx
+        # 因为W为邻接矩阵，是对称的，所以将 col_idx作为row_idx，就变成了row-major order
+        cc, rr, vv = scipy.sparse.find(W)
+        # 两个顺序：1.本层点的生成顺序，即本层id； 2.基于本层id 的 degree 顺序。二者共同决定下一层 id
+        # 按照本层 id 排序。在这个基准上使用上一轮得到的degree increased rid 进行索引，
+        # 先聚合 degree 小的点
+        # perm = np.argsort(idx_row)
+        # rr = idx_row[perm]
+        # cc = idx_col[perm]
+        # vv = val[perm]
+        # 为每个不孤立的点分配cluster, 一共有 len(rid) 个点，len(cluster_id)=len(rid)
+        # 每个 vertix 的起点对应的 cluster id , 由该 vertix 被 cluster 的优先级
+        # 决定，没啥意义，单纯的id
+        cluster_id = metis_one_level(rr, cc, vv, rid, weights)  # rr is ordered
+        parents.append(cluster_id)
+        
+        # TO DO
+        # COMPUTE THE SIZE OF THE SUPERNODES AND THEIR DEGREE
+        # supernode_size = full(   sparse(cluster_id,  ones(N,1) , supernode_size )     )
+        # print(cluster_id)
+        # print(supernode_size)
+        # nd_sz{count+1}=supernode_size;
+        
+        # COMPUTE THE EDGES WEIGHTS FOR THE NEW GRAPH
+        # 每个起点 vertix 所属的 cluster id , 由该 vertix 被 cluster 的优先级决定
+        nrr = cluster_id[rr]  # [num of vertix]
+        # 求每个终点 vertix 对应的 cluster id , 由该 vertix 被 cluster 的优先级决定
+        ncc = cluster_id[cc]  # [num of vertix]
+        nvv = vv  # 每个 cluster 的 weight
+        Nnew = cluster_id.max() + 1  # 一共多少 cluster
+        # CSR is more appropriate: row,val pairs appear multiple times
+        # cluster 的两两组合 作为新的 pair , 创建新的 邻接矩阵
+        # 有层间父子id映射 claster_id，和父层的拓扑关系 W, W中 weight越大表示节点连接关系的越强，能够
+        # 指导下一次cluster
+        # scipy adds the values of the duplicate entries:  merge weights of cluster.
+        # 本操作会产生自环，合并的新节点带有自环，剩下的孤立点没有自环，下次优先合并没有自环的
+        # W 的 index 代表new cluster 的 id(形成的优先性)
+        # e.g.  W[0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
+        
+        W = scipy.sparse.coo_matrix((nvv, (nrr, ncc)), shape=(Nnew, Nnew))
+        W.eliminate_zeros()  # 稀疏
+        
+        # Add new graph to the list of all coarsened graphs
+        # graphs.append(W)
+        
+        # COMPUTE THE DEGREE (OMIT OR NOT SELF LOOPS) 忽略自环，weight变小，该点更容易被团结。
+        # 但是如果该点已经是团结过好几次的了，那么应该减小它被继续团结的可能，否则会产生吸收黑洞，
+        # 所以不能忽略自环
+        degree = W.sum(axis=0)
+        
+        # degree = W.sum(axis=0) - W.diagonal()
+        
+        # CHOOSE THE ORDER IN WHICH VERTICES WILL BE VISTED AT THE NEXT PASS
+        # [~, rid]=sort(ss);     # arthur strategy
+        # [~, rid]=sort(supernode_size);    #  thomas strategy
+        # rid=randperm(N);                  #  metis/graclus strategy
+        ss = np.array(W.sum(axis=0)).squeeze()
+        # 根据 degree accend 将cluster id 排序。 下一层从degree小的开始 cluster 开始后续 cluster
+        # 目的在于先解决孤立点
+        rid = np.argsort(ss)  #
+        pt_num = Nnew
+    
+    return W, parents
+
+
+def decimate(vertice, adj, target_num):
     """
     Coarsen a graph, represented by its adjacency matrix A, at multiple
     levels.
@@ -13,32 +158,80 @@ def coarsen(A,levels, biased):
     # graph: graph[i] 的 index 代表本层cluster 的 id(形成的顺序)
     # e.g.  graph[i][0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
     # parents:下层id到上层id之间的映射。id是本层cluster形成的顺序
+    if vertice.shape[0] <= target_num:
+        mapping_fwd = np.arange(vertice.shape[0])
+    else:
+        A = adj_to_A(adj)
+        A_out, parents = metis_to_num(A, target_num)
+        # 3 graphs   2 parents
+        assert is_Symm(A_out)
+        adj = A_to_adj(A_out)
+        # 根据最顶层id升序，返回自底向上的id二叉树，二叉树的结构定义了层间连接关系
+        perms, mapping_fwd = compute_perm_decimate(parents)  # 3 perms
+        perm = np.array(perms[0])
+        
+        # [N+padding_size,3]
+        vertice = vertice[perm]
+        cluster_num = len(parents)
+        for i in range(cluster_num):
+            vertice = vertice.reshape([-1, 2, 3])
+            vertice = np.mean(vertice, 1)
+    
+    print(np.array(mapping_fwd).shape)
+    # vertice: [decimate_size,3]
+    return vertice, adj, np.array(mapping_fwd)
 
-    A_out, parents = metis(A, levels,biased) # 3 graphs   2 parents
+
+def recover_area(dec_area_id, mapping_fwd,pt_num):
+    dec_id_dup = mapping_fwd
+    dec_id_sort = np.sort(dec_id_dup)
+    org_id_correspond = np.argsort(dec_id_dup)
+    
+    dec_id, cluster_id = np.unique(dec_id_sort, return_index=True)
+    cluster_end_id = np.append(cluster_id[1:], np.array([pt_num]))
+    recover_area_id = []
+    for i, (id_start, id_end) in enumerate(zip(cluster_id, cluster_end_id)):
+        if i in dec_area_id:
+            recover_area_id.extend(org_id_correspond[id_start:id_end])
+    return np.array(recover_area_id)
+
+
+def coarsen(A, levels, biased):
+    """
+    Coarsen a graph, represented by its adjacency matrix A, at multiple
+    levels.
+    A: 按 id 升序排列的 adjacency matrix
+    levels: 压缩 2**levels 倍
+    """
+    # graph: graph[i] 的 index 代表本层cluster 的 id(形成的顺序)
+    # e.g.  graph[i][0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
+    # parents:下层id到上层id之间的映射。id是本层cluster形成的顺序
+    
+    A_out, parents = metis(A, levels, biased)  # 3 graphs   2 parents
     # 根据最顶层id升序，返回自底向上的id二叉树，二叉树的结构定义了层间连接关系
     perm_in, fwd_map = compute_perm(parents)  # 3 perms
-
+    
     # if not self_connections:
     #     A_out = A_out.tocoo()
     #     A_out.setdiag(0)
     
+    return perm_in, A_out, fwd_map
 
-
-    return perm_in, A_out,fwd_map
 
 def newadj(adj_path):
-    path=adj_path.split('.')[0]
-    new_path=path+'1.txt'
-    fnew=open(new_path,'w')
+    path = adj_path.split('.')[0]
+    new_path = path + '1.txt'
+    fnew = open(new_path, 'w')
     with open(adj_path)as f:
-        G=f.readlines()
+        G = f.readlines()
         for line in G[1:]:
             fnew.write(line)
     fnew.close()
     return new_path
-    
-    
-def multi_coarsen(adj,coarsen_levels):
+
+
+
+def multi_coarsen(adj, coarsen_levels):
     '''
 
     :param adj_path:
@@ -55,14 +248,14 @@ def multi_coarsen(adj,coarsen_levels):
     # adj=np.concatenate([adj,np.zeros([adj.shape[0],adj_len-adj.shape[1]],dtype=np.int32)],axis=1)
     perms = []
     adjs = []
-    pool_maps=[]
-    adjs.append(adj) # adj 比 perm  多一个
-    for i,coarsen_level in enumerate(coarsen_levels):
-        if i==0:
+    pool_maps = []
+    adjs.append(adj)  # adj 比 perm  多一个
+    for i, coarsen_level in enumerate(coarsen_levels):
+        if i == 0:
             
             # 可以兼容adj截断的状况，不会越界，但是不再是对称矩阵
             A_in = adj_to_A(adj)
-            biased=False
+            biased = False
             # is_symm,sub=is_Symm(A_in)
             # r,c,v=scipy.sparse.find(sub)
             # rcv=np.stack([r,c,v],axis=-1)
@@ -71,21 +264,22 @@ def multi_coarsen(adj,coarsen_levels):
             #     print(r)
             #     print(c)
         else:
-            A_in=A_out
-            biased=True
+            A_in = A_out
+            biased = True
         # is_symm, sub = is_Symm(A_in)
-        perm_in, A_out, fwd_map = coarsen(A_in, coarsen_level,biased)
+        perm_in, A_out, fwd_map = coarsen(A_in, coarsen_level, biased)
         perms.append(perm_in)
-        A_adj=A_out.copy()
+        A_adj = A_out.copy()
         adj = A_to_adj(A_adj)
         adjs.append(adj)
         pool_maps.append(fwd_map)
-
-    return perms+adjs+pool_maps
+    
+    return perms + adjs + pool_maps
 
 
 def is_Symm(W):
-    return (abs(W - W.T) > 0).nnz==0, abs(W - W.T)
+    return (abs(W - W.T) > 0).nnz == 0, abs(W - W.T)
+
 
 def metis(W, levels, biased):
     """
@@ -108,7 +302,7 @@ def metis(W, levels, biased):
     """
     # print(is_Symm(W))
     N, N = W.shape
-
+    
     if biased:
         ss = np.array(W.sum(axis=0)).squeeze()
         rid = np.argsort(ss)  # 按照节点的度来确定处理顺序
@@ -120,22 +314,21 @@ def metis(W, levels, biased):
     
     # graphs = []
     # graphs.append(W)
-
+    
     for l in range(levels):
-
-        #count += 1
-
+        # count += 1
+        
         # CHOOSE THE WEIGHTS FOR THE PAIRING
         # weights = ones(N,1)       # metis weights
-        weights = degree            # graclus weights [N]
+        weights = degree  # graclus weights [N]
         # weights = supernode_size  # other possibility
         weights = np.array(weights).squeeze()
-
+        
         # check=is_Symm(W)
         # PAIR THE VERTICES AND CONSTRUCT THE ROOT VECTOR
         # column-major order  row_idx  col_idx   val_idx
         # 因为W为邻接矩阵，是对称的，所以将 col_idx作为row_idx，就变成了row-major order
-        cc, rr,  vv = scipy.sparse.find(W)
+        cc, rr, vv = scipy.sparse.find(W)
         # 两个顺序：1.本层点的生成顺序，即本层id； 2.基于本层id 的 degree 顺序。二者共同决定下一层 id
         # 按照本层 id 排序。在这个基准上使用上一轮得到的degree increased rid 进行索引，
         # 先聚合 degree 小的点
@@ -146,21 +339,21 @@ def metis(W, levels, biased):
         # 为每个不孤立的点分配cluster, 一共有 len(rid) 个点，len(cluster_id)=len(rid)
         # 每个 vertix 的起点对应的 cluster id , 由该 vertix 被 cluster 的优先级
         # 决定，没啥意义，单纯的id
-        cluster_id = metis_one_level(rr,cc,vv,rid,weights)  # rr is ordered
+        cluster_id = metis_one_level(rr, cc, vv, rid, weights)  # rr is ordered
         parents.append(cluster_id)
-
+        
         # TO DO
         # COMPUTE THE SIZE OF THE SUPERNODES AND THEIR DEGREE
-        #supernode_size = full(   sparse(cluster_id,  ones(N,1) , supernode_size )     )
-        #print(cluster_id)
-        #print(supernode_size)
-        #nd_sz{count+1}=supernode_size;
-
+        # supernode_size = full(   sparse(cluster_id,  ones(N,1) , supernode_size )     )
+        # print(cluster_id)
+        # print(supernode_size)
+        # nd_sz{count+1}=supernode_size;
+        
         # COMPUTE THE EDGES WEIGHTS FOR THE NEW GRAPH
         # 每个起点 vertix 所属的 cluster id , 由该 vertix 被 cluster 的优先级决定
-        nrr = cluster_id[rr] # [num of vertix]
+        nrr = cluster_id[rr]  # [num of vertix]
         # 求每个终点 vertix 对应的 cluster id , 由该 vertix 被 cluster 的优先级决定
-        ncc = cluster_id[cc] #[num of vertix]
+        ncc = cluster_id[cc]  # [num of vertix]
         nvv = vv  # 每个 cluster 的 weight
         Nnew = cluster_id.max() + 1  # 一共多少 cluster
         # CSR is more appropriate: row,val pairs appear multiple times
@@ -172,54 +365,53 @@ def metis(W, levels, biased):
         # W 的 index 代表new cluster 的 id(形成的优先性)
         # e.g.  W[0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
         
-        
-        W = scipy.sparse.coo_matrix((nvv,(nrr,ncc)), shape=(Nnew,Nnew))
-        W.eliminate_zeros() # 稀疏
+        W = scipy.sparse.coo_matrix((nvv, (nrr, ncc)), shape=(Nnew, Nnew))
+        W.eliminate_zeros()  # 稀疏
         
         assert is_Symm(W)
         # Add new graph to the list of all coarsened graphs
         # graphs.append(W)
-
+        
         # COMPUTE THE DEGREE (OMIT OR NOT SELF LOOPS) 忽略自环，weight变小，该点更容易被团结。
         # 但是如果该点已经是团结过好几次的了，那么应该减小它被继续团结的可能，否则会产生吸收黑洞，
         # 所以不能忽略自环
         degree = W.sum(axis=0)
-
+        
         # degree = W.sum(axis=0) - W.diagonal()
-
+        
         # CHOOSE THE ORDER IN WHICH VERTICES WILL BE VISTED AT THE NEXT PASS
-        #[~, rid]=sort(ss);     # arthur strategy
-        #[~, rid]=sort(supernode_size);    #  thomas strategy
-        #rid=randperm(N);                  #  metis/graclus strategy
+        # [~, rid]=sort(ss);     # arthur strategy
+        # [~, rid]=sort(supernode_size);    #  thomas strategy
+        # rid=randperm(N);                  #  metis/graclus strategy
         ss = np.array(W.sum(axis=0)).squeeze()
         # 根据 degree accend 将cluster id 排序。 下一层从degree小的开始 cluster 开始后续 cluster
         # 目的在于先解决孤立点
-        rid = np.argsort(ss) #
+        rid = np.argsort(ss)  #
     # graphs 比 parents 多一层
     # graphs: finest to coarsest  包含自环,权值可以大于1，代表连接强弱
     return W, parents
 
 
 # Coarsen a graph given by rr,cc,vv.  rr is assumed to be ordered
-def metis_one_level(rr,cc,vv,rid,weights):
+def metis_one_level(rr, cc, vv, rid, weights):
     # 只有起点rr排好序(本层cluster的生成顺序)，终点cc是随机的
-
-    nnz = rr.shape[0] # 所有pair的数量
-    N = rr[nnz-1] + 1 # 点的数量
-
+    
+    nnz = rr.shape[0]  # 所有pair的数量
+    N = rr[nnz - 1] + 1  # 点的数量
+    
     marked = np.zeros(N, np.bool)
     rowstart = np.zeros(N, np.int32)
     rowlength = np.zeros(N, np.int32)
     cluster_id = np.zeros(N, np.int32)
-
+    
     oldval = rr[0]
     count = 0
     clustercount = 0
-    rc=np.stack([rr,cc],axis=-1)
+    rc = np.stack([rr, cc], axis=-1)
     for ii in range(nnz):
         if rr[ii] > oldval:
             oldval = rr[ii]
-            rowstart[count+1] = ii
+            rowstart[count + 1] = ii
             count = count + 1
         rowlength[count] = rowlength[count] + 1
     
@@ -231,26 +423,26 @@ def metis_one_level(rr,cc,vv,rid,weights):
             marked[tid] = True
             bestneighbor = -1
             for jj in range(rowlength[tid]):
-                nid = cc[rs+jj]
+                nid = cc[rs + jj]
                 if marked[nid]:
                     tval = 0.0
                 else:
-                    tval = vv[rs+jj] * (1.0/weights[tid] + 1.0/weights[nid])
-                    if weights[tid]==0:
+                    tval = vv[rs + jj] * (1.0 / weights[tid] + 1.0 / weights[nid])
+                    if weights[tid] == 0:
                         print('zeros')
-                        
+                
                 if tval > wmax:
                     wmax = tval
                     bestneighbor = nid
             # tid 第一层是随机的，以后每层是 degree 升序
             cluster_id[tid] = clustercount
-
+            
             if bestneighbor > -1:
                 cluster_id[bestneighbor] = clustercount
                 marked[bestneighbor] = True
-
+            
             clustercount += 1
-
+    
     return cluster_id
 
 
@@ -260,7 +452,7 @@ def compute_perm(parents):
     that the union of two neighbors from layer to layer forms a binary tree.
     产生底层根据顶层排序，并加入fake_nodes后的排序，最底层会用于构建二叉树
     """
-
+    
     # Order of last layer is random (chosen by the clustering algorithm).
     indices = []
     if len(parents) > 0:
@@ -268,27 +460,27 @@ def compute_perm(parents):
         id_map = np.array(list(range(M_last)))  # rank the cluster id of the last layer
         indices.append(list(range(M_last)))  # rank the cluster id of the last layer
         # 只有最后一层需要排序 indices=[0,1,2]
-
+    
     for parent in parents[::-1]:
         # from the coarsest level
         # print('parent: {}'.format(parent))
-
+        
         # Fake nodes go after real ones. len(parent) is the number of real node in this layer
         # add new id for fake nodes of this layer
         id_map = id_map[parent]
-
+        
         pool_singeltons = len(parent)
-
+        
         indices_layer = []
         for i in indices[-1]:
-
+            
             # 每个父节点对应一个 indices_node, 索引上一层中的子节点
             # index of where condition is true
             indices_node = list((np.where(parent == i)[0]).astype(np.int32))
-
+            
             assert 0 <= len(indices_node) <= 2
             # print('indices_node: {}'.format(indices_node))
-
+            
             # Add a node to go with a singelton.
             if len(indices_node) is 1:
                 # 本层是独生子
@@ -302,12 +494,12 @@ def compute_perm(parents):
                 indices_node.append(pool_singeltons + 1)
                 pool_singeltons += 2
                 # print('singelton childrens: {}'.format(indices_node))
-
+            
             indices_layer.extend(indices_node)  # 每次加两个元素：上一层的两个索引
         # 将根据indices[-1](coarser layer)节点顺序推导出的 indices_layer(finer layer)
         # 放入 indices。 因此 indices 中包含的由 coarser 到 finer 的层节点索引
         indices.append(indices_layer)
-
+    
     # Sanity checks.
     for i, indices_layer in enumerate(indices):
         M = M_last * 2 ** i
@@ -315,7 +507,7 @@ def compute_perm(parents):
         assert len(indices_layer) == M
         # The new ordering does not omit an indice.
         assert sorted(indices_layer) == list(range(M))
-
+    
     return np.array(indices[-1]), id_map  # finest to coarsest
 
 
@@ -329,12 +521,12 @@ def perm_data(x, indices):
     """
     if indices is None:
         return x
-
-    M,channel = x.shape
+    
+    M, channel = x.shape
     Mnew = len(indices)
     assert Mnew >= M
-    xnew = np.empty((Mnew,channel))
-    for i,j in enumerate(indices):
+    xnew = np.empty((Mnew, channel))
+    for i, j in enumerate(indices):
         # Existing vertex, i.e. real data.
         if j < M:
             xnew[i] = x[j]
@@ -344,6 +536,7 @@ def perm_data(x, indices):
         else:
             xnew[i] = np.zeros(channel)
     return xnew
+
 
 def perm_adjacency(A, indices):
     """
@@ -356,7 +549,7 @@ def perm_adjacency(A, indices):
     """
     if indices is None:
         return A
-
+    
     M, M = A.shape
     # 45 03 21    if 345 is fake, M=3
     # 0  1  2
@@ -364,15 +557,15 @@ def perm_adjacency(A, indices):
     Mnew = len(indices)
     assert Mnew >= M
     A = A.tocoo()
-
+    
     # Add Mnew - M isolated vertices.
     if Mnew > M:
         # 将[M,M]补0得到[Mnew,Mnew]
-        rows = scipy.sparse.coo_matrix((Mnew-M,    M), dtype=np.float32)
-        cols = scipy.sparse.coo_matrix((Mnew, Mnew-M), dtype=np.float32)
+        rows = scipy.sparse.coo_matrix((Mnew - M, M), dtype=np.float32)
+        cols = scipy.sparse.coo_matrix((Mnew, Mnew - M), dtype=np.float32)
         A = scipy.sparse.vstack([A, rows])
         A = scipy.sparse.hstack([A, cols])
-
+    
     # Permute the rows and the columns.
     # e.g. 254|301
     #      012
@@ -384,7 +577,7 @@ def perm_adjacency(A, indices):
     # 还应该有对x的对应交换操作。交换完成后可以进行 两两 max 的 pooling 操作
     A.row = np.array(perm)[A.row]
     A.col = np.array(perm)[A.col]
-
+    
     # assert np.abs(A - A.T).mean() < 1e-9
     assert type(A) is scipy.sparse.coo.coo_matrix
     return A
@@ -396,21 +589,21 @@ def adj_to_A(adj):
     :param adj: num_points, K
     :return:
     '''
-    num_points, K=adj.shape
-    idx=np.arange(num_points)
-    idx = np.reshape(idx, [-1, 1])    # Convert to a n x 1 matrix.
+    num_points, K = adj.shape
+    idx = np.arange(num_points)
+    idx = np.reshape(idx, [-1, 1])  # Convert to a n x 1 matrix.
     idx = np.tile(idx, [1, K])  # [pt_num,K] Create multiple columns, each column has one number repeats repTime
-    x = np.reshape(idx, [-1]) # [pt_num*K] 0000  1111 2222 3333 4444 从0开始 []
-    y =np.reshape(adj, [-1]) # [pt_num * K]
-    mask=np.where(y!=0)[0]
-    y=y[mask]-1
-    x=x[mask]
-    v=np.ones_like(mask)
+    x = np.reshape(idx, [-1])  # [pt_num*K] 0000  1111 2222 3333 4444 从0开始 []
+    y = np.reshape(adj, [-1])  # [pt_num * K]
+    mask = np.where(y != 0)[0]
+    y = y[mask] - 1
+    x = x[mask]
+    v = np.ones_like(mask)
     A = scipy.sparse.coo_matrix((v, (x, y)), shape=(num_points, num_points))
     # A=A.tocsr()
     # A.setdiag(0)
     A.eliminate_zeros()  # 稀疏
-    s=is_Symm(A)
+    s = is_Symm(A)
     return A
 
 
@@ -421,72 +614,80 @@ def A_to_adj(A):
     :return: num_points, K
     '''
     A.setdiag(0)
-    cc,rr,  val = scipy.sparse.find(A)
+    cc, rr, val = scipy.sparse.find(A)
     # 发现 A 不对称
     # perm = np.argsort(rr)
     # rr = rr[perm]
     # cc = cc[perm]
-    N,N=A.shape
+    N, N = A.shape
     K = np.max((A != 0).sum(axis=0))
-
-    pair_num=rr.shape[0]
-    adj = np.zeros([N,K], np.int32)
+    
+    pair_num = rr.shape[0]
+    adj = np.zeros([N, K], np.int32)
     cur_row = rr[0]
-    cur_col=0
+    cur_col = 0
     for i in range(pair_num):
-        if rr[i]>cur_row:
-            adj[cur_row,cur_col:]=0
-            cur_row=rr[i]
-            cur_col=0
-        adj[rr[i],cur_col]=cc[i]+1
-        cur_col+=1
+        if rr[i] > cur_row:
+            adj[cur_row, cur_col:] = 0
+            cur_row = rr[i]
+            cur_col = 0
+        adj[rr[i], cur_col] = cc[i] + 1
+        cur_col += 1
     return adj
 
 
-def normalize(world_coord,part_id):
+def area_preprocess(vertice, adj, coarsen_levels, target_num, part_id):
+    vertice, center = normalize(vertice, part_id)
+    vertice, adj, mapping_fwd = decimate(vertice, adj, target_num)
+    return multi_coarsen(adj, coarsen_levels) + [vertice, mapping_fwd]
+
+
+def normalize(world_coord, part_id):
     '''
-    
+
     :param world_coord:
     :param vtype: 0DL   1DR   2UL   3 UR
     :return:
     '''
     center = np.mean(world_coord, axis=0)
-
+    
     local_coord = world_coord - center
     if part_id == 1:
-        local_coord = local_coord * np.array([-1, 1, 1],dtype=np.float32)
+        local_coord = local_coord * np.array([-1, 1, 1], dtype=np.float32)
     elif part_id == 2:
-        local_coord = local_coord * np.array([1, -1, 1],dtype=np.float32)
+        local_coord = local_coord * np.array([1, -1, 1], dtype=np.float32)
     elif part_id == 3:
-        local_coord = local_coord * np.array([-1, -1, 1],dtype=np.float32)
-    return [local_coord.astype(np.float32),center]
+        local_coord = local_coord * np.array([-1, -1, 1], dtype=np.float32)
+    return [local_coord.astype(np.float32), center]
 
-def ivs_normalize(local_coord,center,part_id):
+
+def ivs_normalize(local_coord, center, part_id):
     if part_id == 1:
-        local_coord = local_coord * np.array([-1, 1, 1],dtype=np.float32)
+        local_coord = local_coord * np.array([-1, 1, 1], dtype=np.float32)
     elif part_id == 2:
-        local_coord = local_coord * np.array([1, -1, 1],dtype=np.float32)
+        local_coord = local_coord * np.array([1, -1, 1], dtype=np.float32)
     elif part_id == 3:
-        local_coord = local_coord * np.array([-1, -1, 1],dtype=np.float32)
+        local_coord = local_coord * np.array([-1, -1, 1], dtype=np.float32)
     world_coord = local_coord + center
     return [world_coord.astype(np.float32)]
-	
+
+
 def parse_feature(feature_file):
-    feat= []
+    feat = []
     with open(feature_file)as f:
         line = f.readline()
         feat_list = line.split(',')[:-1]
-        for i,feat3d in enumerate(feat_list[1:]):
+        for i, feat3d in enumerate(feat_list[1:]):
             feat3d_array = np.array(list(map(float, feat3d.split())))
             feat_coord = feat3d_array[1:]
             feat.append(feat_coord)
-    feat_arr=np.array(feat)
+    feat_arr = np.array(feat)
     return feat_arr
 
 
-def loss_debug(pred,label_path):
-    label=parse_feature(label_path)
-    loss=np.mean(np.sum(np.square(label-pred),axis=-1))
+def loss_debug(pred, label_path):
+    label = parse_feature(label_path)
+    loss = np.mean(np.sum(np.square(label - pred), axis=-1))
     return [np.array(loss).astype(np.float32)]
-    
+
 

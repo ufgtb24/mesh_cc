@@ -7,7 +7,7 @@
 
 
 
-int main()
+int main0()
 {
 	string graph_path = "E:/VS_Projects/Mesh/Test/feature_premollar.pb";
 	string python_path = "D:/Python";

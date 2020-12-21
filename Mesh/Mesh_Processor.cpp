@@ -65,7 +65,6 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, PartID part_id)
 	//init_numpy();
 
 	npy_intp Dims[2] = { pt_num, 3 };
-
 	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, x);
 	PyObject* ArgArray = PyTuple_New(2);
 	PyTuple_SetItem(ArgArray, 0, X);

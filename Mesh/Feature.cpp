@@ -75,7 +75,6 @@ PyObject* Feature_Processor::coarsen(int* adj, int pt_num, int init_K)
 	for(int i =0;i< c_times;i++)
 		PyList_SetItem(array, i, Py_BuildValue("i", c_levels[i]));
 
-
 	PyTuple_SetItem(ArgArray, 1, array);
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Coarsen, ArgArray);

@@ -93,7 +93,7 @@ public:
 	Area_Processor(string graph_path,
 		string python_path, string script_name, int coasen_times, int coarsen_levels[]);
 	~Area_Processor();
-	int* predict(float* vertice, int* adj, int pt_num, int init_K, PartID part_id);
+	int* predict(float* vertice, int* adj, int pt_num, int init_K, PartID part_id, int& num);
 
 #if defined(AI_DEBUG)
 	float get_loss(const char* label_path, int f_num, float* predict);
@@ -115,7 +115,7 @@ private:
 
 	PyObject* preprocess(float* vertice_ori,int* adj, int pt_num, int init_K, 
 		PartID part_id,int target_num );
-	PyObject* postprocess(int* dec_id, int* dec_map, int pt_num, int dec_num);
+	PyObject* postprocess(int* dec_area_id, int dec_area_num, int* dec_map, int pt_num);
 
 	int* run_graph(float* vertice, int pt_num, PyObject* perm_adj_map, int& out_size);
 

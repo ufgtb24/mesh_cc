@@ -177,23 +177,24 @@ def decimate(vertice, adj, target_num):
             vertice = vertice.reshape([-1, 2, 3])
             vertice = np.mean(vertice, 1)
     
-    print(np.array(mapping_fwd).shape)
     # vertice: [decimate_size,3]
     return vertice, adj, np.array(mapping_fwd)
 
 
-def recover_area(dec_area_id, mapping_fwd,pt_num):
-    dec_id_dup = mapping_fwd
-    dec_id_sort = np.sort(dec_id_dup)
-    org_id_correspond = np.argsort(dec_id_dup)
-    
+def recover_area(dec_area_id, mapping_fwd):
+    dec_area_id=dec_area_id.astype(np.int64)
+    pt_num=mapping_fwd.shape[0]
+
+    dec_id_sort = np.sort(mapping_fwd)
+    org_id_correspond = np.argsort(mapping_fwd)
+
     dec_id, cluster_id = np.unique(dec_id_sort, return_index=True)
     cluster_end_id = np.append(cluster_id[1:], np.array([pt_num]))
     recover_area_id = []
     for i, (id_start, id_end) in enumerate(zip(cluster_id, cluster_end_id)):
         if i in dec_area_id:
             recover_area_id.extend(org_id_correspond[id_start:id_end])
-    return np.array(recover_area_id)
+    return [np.array(recover_area_id, dtype=np.int32)]
 
 
 def coarsen(A, levels, biased):
@@ -268,11 +269,11 @@ def multi_coarsen(adj, coarsen_levels):
             biased = True
         # is_symm, sub = is_Symm(A_in)
         perm_in, A_out, fwd_map = coarsen(A_in, coarsen_level, biased)
-        perms.append(perm_in)
+        perms.append(perm_in.astype(np.int32))
         A_adj = A_out.copy()
         adj = A_to_adj(A_adj)
-        adjs.append(adj)
-        pool_maps.append(fwd_map)
+        adjs.append(adj.astype(np.int32))
+        pool_maps.append(fwd_map.astype(np.int32))
     
     return perms + adjs + pool_maps
 
@@ -639,7 +640,8 @@ def A_to_adj(A):
 def area_preprocess(vertice, adj, coarsen_levels, target_num, part_id):
     vertice, center = normalize(vertice, part_id)
     vertice, adj, mapping_fwd = decimate(vertice, adj, target_num)
-    return multi_coarsen(adj, coarsen_levels) + [vertice, mapping_fwd]
+    return multi_coarsen(adj, coarsen_levels) + \
+            [vertice.astype(np.float32), mapping_fwd.astype(np.int32)]
 
 
 def normalize(world_coord, part_id):

@@ -41,6 +41,14 @@ PyObject* Mesh_Processor::init_python(string python_path, string script_name)
 	if (pModule == nullptr)
 		cout << "no script is load";
 	return pModule;
+
+//天坑！！！！！！！
+//脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
+//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
+//Python中的返回数据一定要显式指定类型为32bit，因为默认是64bit，而
+//C++ 中，即使是64位机器 float 和 int 也是32 位的！！！！！！
+//同样的，C++向 python 传入的值，在python 中需要先转化为 64位，再计算
+
 }
 
 int Mesh_Processor::init_numpy()

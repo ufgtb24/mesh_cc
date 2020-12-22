@@ -27,10 +27,14 @@ int main()
 	Area_Processor* mp = new Area_Processor(graph_path, python_path, "coarsening", 4, c_levels);
 
 
-
-
-	int* output=mp->predict(x, adj, actual_pt_num, K, PartID::LU);
-
+	for (int i = 0; i < 5; i++) {
+		clock_t end0 = clock();
+		int size;
+		int* output = mp->predict(x, adj, actual_pt_num, K, PartID::LU, size);
+		cout<<"area pts num = "<<size<<endl;
+		clock_t end1 = clock();
+		cout << "once time: " << end1 - end0 << "\n\n\n";
+	}
 #if defined(AI_DEBUG)
 
 		float loss = mp->get_loss(label_path, feat_num, output_loss);

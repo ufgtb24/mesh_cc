@@ -25,11 +25,6 @@ void Orientation_Processor::init_python(string python_path, string script_name)
 {
 	PyObject* pModule = Mesh_Processor::init_python(python_path, script_name);
 	init_numpy();
-	//天坑！！！！！！！
-	//脚本无论有多少返回值，一定要放到一个列表里，即使只有一个！！！！！！
-	//编辑 脚本 一定要用 Pycharm 打开，不然会有看不出来的格式错误！！！！！
-	//Python中的返回数据一定要显式指定类型为32bit，因为默认是64bit，而
-	//C++ 中，即使是64位机器 float 和 int 也是32 位的！！！！！！
 	pFunc_Coarsen = PyObject_GetAttrString(pModule, "multi_coarsen");//multi_coarsen
 	if (pFunc_Coarsen == nullptr)
 		cout << "no pFunc_Coarsen is load" << endl;

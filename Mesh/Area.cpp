@@ -106,6 +106,7 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
 	int init_K, PartID part_id,int& num)
 {
+	cout << "inside area predict\n\n\n";
 	clock_t start0 = clock();
 	PyObject* perm_adj_pmap_dmap = preprocess(vertice_ori,adj, pt_num, init_K, part_id,2000);
 	clock_t end0 = clock();
@@ -118,17 +119,19 @@ int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
 	int* dec_area_id = run_graph((float*)(vertice_dec->data), vertice_dec->dimensions[0], 
 		perm_adj_pmap_dmap, dec_area_num);
 
-	//cout << "pt_num  " << pt_num << endl;
-	//cout << "dec_map size = " << dec_map->dimensions[0] << endl;
-	//cout << "dec_pts_num = " << vertice_dec->dimensions[0] << endl;
-	//cout << "dec_area_num = " << dec_area_num << endl;
+	cout << "pt_num  " << pt_num << endl;
+	cout << "dec_map size = " << dec_map->dimensions[0] << endl;
+	cout << "dec_v size = " << vertice_dec->dimensions[0] << endl;
+	cout << "dec_area_num = " << dec_area_num << endl;
 
 	PyObject* recover_id=postprocess(dec_area_id, dec_area_num, (int*)(dec_map->data), pt_num);
 	PyArrayObject* id_np = (PyArrayObject*)PyList_GetItem(recover_id, 0);
 	int* output = (int*)(id_np->data);
 	num = id_np->dimensions[0];
+	cout << "detect area num = " << num << endl;
+	if (num < pt_num * 0.1)
+		num = 0;
 	return output;
-
 }
 
 int* Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_map, int& out_size) {
@@ -138,12 +141,22 @@ int* Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_ma
 	vector<pair<string, Tensor>> inputs;
 
 
-
-	const int64_t tensorDims[3] = { 1,pt_num ,3 };
-	TF_Tensor* v_tensor = TF_NewTensor(TF_FLOAT, tensorDims, 3,
-		vertice, ((size_t)pt_num * 3) * sizeof(float),
+	//////////////
+	const int64_t n_Dims[3] = {};
+	TF_Tensor* n_tensor = TF_NewTensor(TF_INT32, n_Dims, 0,
+		&pt_num, sizeof(int32),
 		DeallocateTensor, NULL);
 
+	Tensor num_tensor = TensorCApi::MakeTensor(n_tensor->dtype, n_tensor->shape, n_tensor->buffer);
+	inputs.push_back({ "pt_num",num_tensor });
+
+	////////////////
+
+
+	const int64_t vDims[3] = { 1,pt_num ,3 };
+	TF_Tensor* v_tensor = TF_NewTensor(TF_FLOAT, vDims, 3,
+		vertice, ((size_t)pt_num * 3) * sizeof(float),
+		DeallocateTensor, NULL);
 
 	Tensor vertice_tensor = TensorCApi::MakeTensor(v_tensor->dtype, v_tensor->shape, v_tensor->buffer);
 	inputs.push_back({ "vertice",vertice_tensor });

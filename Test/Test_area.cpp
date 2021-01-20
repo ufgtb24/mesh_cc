@@ -16,24 +16,36 @@ int main()
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
 	int actual_pt_num = load_file(
-		"F:/ProjectData/mesh_area/Case_train/brk0/AL89 AL89/up/17/adj.txt",
+		"adj.txt",
 		adj, K);
+
+	//int actual_pt_num = load_file(
+	//	"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/DownArchL/tooth4/adj.txt",
+	//	adj, K);
 
 	float* x = new float[pt_num * 3];
 	load_file(
-		"F:/ProjectData/mesh_area/Case_train/brk0/AL89 AL89/up/17/vertice.txt",
+		"vertice.txt",
 		x, 3);
+
+	//load_file(
+	//	"F:/ProjectData/mesh_feature/Case_debug/Case/low/ChristianLagos-8toothL 00/DownArchL/tooth4/vertice.txt",
+	//	x, 3);
+
 	int c_levels[] = { 2,2,3,3 };
 	Area_Processor* mp = new Area_Processor(graph_path, python_path, "coarsening", 4, c_levels);
 
 
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 3; i++) {
 		clock_t end0 = clock();
 		int size;
 		int* output = mp->predict(x, adj, actual_pt_num, K, PartID::LU, size);
-		cout<<"area pts num = "<<size<<endl;
 		clock_t end1 = clock();
 		cout << "once time: " << end1 - end0 << "\n\n\n";
+		if (size < 100) {
+			cout << "error!!!!!!!!!!!!\n";
+			getchar();
+		}
 	}
 #if defined(AI_DEBUG)
 

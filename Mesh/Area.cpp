@@ -128,7 +128,7 @@ int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
 	PyArrayObject* id_np = (PyArrayObject*)PyList_GetItem(recover_id, 0);
 	int* output = (int*)(id_np->data);
 	num = id_np->dimensions[0];
-	cout << "detect area num = " << num << endl;
+	cout << "recover_area_num = " << num << endl;
 	if (num < pt_num * 0.1)
 		num = 0;
 	return output;

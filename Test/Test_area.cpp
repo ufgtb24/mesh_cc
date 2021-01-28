@@ -16,12 +16,12 @@ int main()
 	int* adj = new int[pt_num * K];
 	memset(adj, 0, sizeof(int) * pt_num * K);
 	int actual_pt_num = load_file(
-		"F:/ProjectData/mesh_area/Case_train/brk0/AL89 AL89/up/17/adj.txt",
+		"adj.txt",
 		adj, K);
 
 	float* x = new float[pt_num * 3];
 	load_file(
-		"F:/ProjectData/mesh_area/Case_train/brk0/AL89 AL89/up/17/vertice.txt",
+		"vertice.txt",
 		x, 3);
 	int c_levels[] = { 2,2,3,3 };
 	Area_Processor* mp = new Area_Processor(graph_path, python_path, "coarsening", 4, c_levels);

@@ -148,53 +148,6 @@ def metis_to_num(W, target_num):
     return W, parents
 
 
-def decimate(vertice, adj, target_num):
-    """
-    Coarsen a graph, represented by its adjacency matrix A, at multiple
-    levels.
-    A: 按 id 升序排列的 adjacency matrix
-    levels: 压缩 2**levels 倍
-    """
-    # graph: graph[i] 的 index 代表本层cluster 的 id(形成的顺序)
-    # e.g.  graph[i][0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
-    # parents:下层id到上层id之间的映射。id是本层cluster形成的顺序
-    if vertice.shape[0] <= target_num:
-        mapping_fwd = np.arange(vertice.shape[0])
-    else:
-        A = adj_to_A(adj)
-        A_out, parents = metis_to_num(A, target_num)
-        # 3 graphs   2 parents
-        assert is_Symm(A_out)
-        adj = A_to_adj(A_out)
-        # 根据最顶层id升序，返回自底向上的id二叉树，二叉树的结构定义了层间连接关系
-        perms, mapping_fwd = compute_perm_decimate(parents)  # 3 perms
-        perm = np.array(perms[0])
-        
-        # [N+padding_size,3]
-        vertice = vertice[perm]
-        cluster_num = len(parents)
-        for i in range(cluster_num):
-            vertice = vertice.reshape([-1, 2, 3])
-            vertice = np.mean(vertice, 1)
-    
-    # vertice: [decimate_size,3]
-    return vertice, adj, np.array(mapping_fwd)
-
-
-def recover_area(dec_area_id, mapping_fwd):
-    dec_area_id=dec_area_id.astype(np.int64)
-    pt_num=mapping_fwd.shape[0]
-
-    dec_id_sort = np.sort(mapping_fwd)
-    org_id_correspond = np.argsort(mapping_fwd)
-
-    dec_id, cluster_id = np.unique(dec_id_sort, return_index=True)
-    cluster_end_id = np.append(cluster_id[1:], np.array([pt_num]))
-    recover_area_id = []
-    for i, (id_start, id_end) in enumerate(zip(cluster_id, cluster_end_id)):
-        if i in dec_area_id:
-            recover_area_id.extend(org_id_correspond[id_start:id_end])
-    return [np.array(recover_area_id, dtype=np.int32)]
 
 
 def coarsen(A, levels, biased):
@@ -641,7 +594,8 @@ def area_preprocess(vertice, adj, coarsen_levels, target_num, part_id):
     vertice, center = normalize(vertice, part_id)
     vertice, adj, mapping_fwd = decimate(vertice, adj, target_num)
     return multi_coarsen(adj, coarsen_levels) + \
-            [vertice.astype(np.float32), mapping_fwd.astype(np.int32)]
+            [vertice.astype(np.float32), mapping_fwd.astype(np.int32),
+             adj.shape[0]]
 
 
 def normalize(world_coord, part_id):
@@ -693,3 +647,92 @@ def loss_debug(pred, label_path):
     return [np.array(loss).astype(np.float32)]
 
 
+def decimate(vertice, adj, target_num):
+    """
+    Coarsen a graph, represented by its adjacency matrix A, at multiple
+    levels.
+    A: 按 id 升序排列的 adjacency matrix
+    levels: 压缩 2**levels 倍
+    """
+    # graph: graph[i] 的 index 代表本层cluster 的 id(形成的顺序)
+    # e.g.  graph[i][0,n]代表最先形成的cluster到第n个形成的cluster之间的连接
+    # parents:下层id到上层id之间的映射。id是本层cluster形成的顺序
+    if vertice.shape[0] <= target_num:
+        mapping_fwd = np.arange(vertice.shape[0])
+    else:
+        A = adj_to_A(adj)
+        A_out, parents = metis_to_num(A, target_num)
+        # 3 graphs   2 parents
+        assert is_Symm(A_out)
+        adj = A_to_adj(A_out)
+        # 根据最顶层id升序，返回自底向上的id二叉树，二叉树的结构定义了层间连接关系
+        perms, mapping_fwd = compute_perm_decimate(parents)  # 3 perms
+        perm = np.array(perms[0])
+        
+        # [N+padding_size,3]
+        vertice = vertice[perm]
+        cluster_num = len(parents)
+        for i in range(cluster_num):
+            vertice = vertice.reshape([-1, 2, 3])
+            vertice = np.mean(vertice, 1)
+    
+    # vertice: [decimate_size,3]
+    return vertice, adj, np.array(mapping_fwd)
+
+def BFS(adj, blur, bg_index, min_cn_num):
+    queue = []
+    queue.append(blur)
+    seen = set()
+    seen.add(blur)
+    connect_num=0
+    while len(queue) > 0:
+        vetex = queue.pop(0)
+        nodes = adj[vetex]-1  #[K]
+
+        for w in nodes:
+            if w not in seen and w!=-1 and w in bg_index:
+                queue.append(w)
+                seen.add(w)
+                connect_num+=1
+                if connect_num>min_cn_num:
+                    # 连通域必须大于 max 才会被坚持认为是背景
+                    # 否则改判为 area
+                    return 0
+    return 1
+
+
+def recover_area(dec_area_id, mapping_fwd):
+    dec_area_id=dec_area_id.astype(np.int64)
+    pt_num=mapping_fwd.shape[0]
+
+    dec_id_sort = np.sort(mapping_fwd)
+    org_id_correspond = np.argsort(mapping_fwd)
+
+    dec_id, cluster_id = np.unique(dec_id_sort, return_index=True)
+    cluster_end_id = np.append(cluster_id[1:], np.array([pt_num]))
+    recover_area_id = []
+    for i, (id_start, id_end) in enumerate(zip(cluster_id, cluster_end_id)):
+        if i in dec_area_id:
+            recover_area_id.extend(org_id_correspond[id_start:id_end])
+    return [np.array(recover_area_id, dtype=np.int32)]
+
+
+def avoid_isolate(area_index,adj,blur_index):
+    area_index=area_index.tolist()
+    blur_index=blur_index.tolist()
+
+    bg_index=np.delete(np.arange(adj.shape[0]), area_index)
+    isolated_num=0
+    print('blur_size = ',len(blur_index))
+    for i in blur_index:
+        if BFS(adj, i, bg_index, 20):
+            area_index.append(i)
+            isolated_num+=1
+                
+    print('isolated_num = ',isolated_num)
+    return np.array(area_index)
+
+
+def area_postprocess(dec_area_id,dec_adj,blur_index,mapping_fwd):
+    area_id=avoid_isolate(dec_area_id,dec_adj,blur_index)
+    return recover_area(area_id, mapping_fwd)

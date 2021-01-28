@@ -44,7 +44,7 @@ void Area_Processor::init_python(string python_path, string script_name)
 	if (pFunc_Preprocess == nullptr)
 		cout << "no pFunc_Preprocess is load" << endl;
 
-	pFunc_Postprocess = PyObject_GetAttrString(pModule, "recover_area");
+	pFunc_Postprocess = PyObject_GetAttrString(pModule, "area_postprocess");
 	if (pFunc_Postprocess == nullptr)
 		cout << "no pFunc_Postprocess is load" << endl;
 
@@ -52,16 +52,11 @@ void Area_Processor::init_python(string python_path, string script_name)
 }
 
 
-PyObject* Area_Processor::preprocess(float* vertice_ori, int* adj, int pt_num, 
-	int init_K, PartID part_id, int target_num)
+PyObject* Area_Processor::preprocess(PyObject* X, PyObject* Adj, 
+	PartID part_id, int target_num)
 {
 	PyObject* ArgArray = PyTuple_New(5);
 
-	npy_intp Dims[2] = { pt_num, 3 };
-	PyObject* X = PyArray_SimpleNewFromData(2, Dims, NPY_FLOAT, vertice_ori);
-
-	npy_intp Dims1[2] = { pt_num, init_K };
-	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims1, NPY_INT, adj);
 
 	PyObject* coarsen_levels = PyList_New(c_times);
 	for (int i = 0; i < c_times; i++)
@@ -78,19 +73,18 @@ PyObject* Area_Processor::preprocess(float* vertice_ori, int* adj, int pt_num,
 }
 
 
-PyObject* Area_Processor::postprocess(int* dec_area_id,int dec_area_num, int* dec_map,int pt_num)
+PyObject* Area_Processor::postprocess(
+	PyObject* Dec,
+	PyObject* Adj, 
+	PyObject* Blur,
+	PyObject* Map
+)
 {
-	PyObject* ArgArray = PyTuple_New(2);
-
-	npy_intp Dims[1] = { dec_area_num };
-	PyObject* DEC = PyArray_SimpleNewFromData(1, Dims, NPY_INT, dec_area_id);
-
-	npy_intp Dims1[1] = { pt_num };
-	PyObject* MAP = PyArray_SimpleNewFromData(1, Dims1, NPY_INT, dec_map);
-
-
-	PyTuple_SetItem(ArgArray, 0, DEC);
-	PyTuple_SetItem(ArgArray, 1, MAP);
+	PyObject* ArgArray = PyTuple_New(4);
+	PyTuple_SetItem(ArgArray, 0, Dec);
+	PyTuple_SetItem(ArgArray, 1, Adj);
+	PyTuple_SetItem(ArgArray, 2, Blur);
+	PyTuple_SetItem(ArgArray, 3, Map);
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Postprocess, ArgArray);
 	return FuncOneBack;
@@ -103,35 +97,13 @@ static void DeallocateTensor(void* data, std::size_t, void*) {
 
 
 
-int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
-	int init_K, PartID part_id,int& num)
-{
-	clock_t start0 = clock();
-	PyObject* perm_adj_pmap_dmap = preprocess(vertice_ori,adj, pt_num, init_K, part_id,2000);
-	clock_t end0 = clock();
-	cout << "preprocess time: " << end0 - start0 << endl;
 
-	PyArrayObject* vertice_dec = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 1);
-	PyArrayObject* dec_map = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 2);
+auto Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_map
+	//int* output,
+	//int* blur,
+	//int& out_size
 
-	int dec_area_num;
-	int* dec_area_id = run_graph((float*)(vertice_dec->data), vertice_dec->dimensions[0], 
-		perm_adj_pmap_dmap, dec_area_num);
-
-	//cout << "pt_num  " << pt_num << endl;
-	//cout << "dec_map size = " << dec_map->dimensions[0] << endl;
-	//cout << "dec_pts_num = " << vertice_dec->dimensions[0] << endl;
-	//cout << "dec_area_num = " << dec_area_num << endl;
-
-	PyObject* recover_id=postprocess(dec_area_id, dec_area_num, (int*)(dec_map->data), pt_num);
-	PyArrayObject* id_np = (PyArrayObject*)PyList_GetItem(recover_id, 0);
-	int* output = (int*)(id_np->data);
-	num = id_np->dimensions[0];
-	return output;
-
-}
-
-int* Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_map, int& out_size) {
+) {
 
 
 	//int* imNumPt = new int(1);
@@ -222,7 +194,7 @@ int* Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_ma
 
 	vector<Tensor> outputs;
 	clock_t start0 = clock();
-	Status status = sess->Run(inputs, { "output_node" }, {}, &outputs);
+	Status status = sess->Run(inputs, { "output_node","blur_node" }, {}, &outputs);
 	if (!status.ok()) {
 		cout<<"run error !!  "<<endl;
 	}
@@ -232,11 +204,77 @@ int* Area_Processor::run_graph(float* vertice, int pt_num, PyObject* perm_adj_ma
 	cout << "sess->Run time: " << end0 - start0 << endl;
 
 	auto output_c = outputs[0].flat<int>();
-	int* output_test = (int*)(output_c.data());
-	out_size = output_c.size();
+	int* output = (int*)(output_c.data());
+	int out_size = output_c.size();
 
-	return output_test;
+	cout << "out_size =" << out_size << endl;
+
+	auto blur_c = outputs[1].flat<int>();
+	int* blur = (int*)(blur_c.data());
+	int blur_size = blur_c.size();
+
+	cout << "blur_size =" << blur_size << endl;
+
+
+
+	return make_tuple(output, out_size, blur, blur_size);
 }
+
+
+int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
+	int init_K, PartID part_id, int& num)
+{
+	clock_t start0 = clock();
+
+
+	npy_intp Dims0[2] = { pt_num, 3 };
+	PyObject* X = PyArray_SimpleNewFromData(2, Dims0, NPY_FLOAT, vertice_ori);
+
+	npy_intp Dims1[2] = { pt_num, init_K };
+	PyObject* Adj = PyArray_SimpleNewFromData(2, Dims1, NPY_INT, adj);
+
+
+
+	PyObject* perm_adj_pmap_dmap = preprocess(X, Adj, part_id, 2000);
+	clock_t end0 = clock();
+	cout << "preprocess time: " << end0 - start0 << endl;
+
+	PyArrayObject* vertice_dec = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 1);
+	PyArrayObject* dec_map = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 2);
+
+	int* dec_area_id;
+	int* blur_area_id;
+	int dec_area_num;
+	int blur_num;
+	tie(dec_area_id, dec_area_num,blur_area_id,blur_num) = run_graph((float*)(vertice_dec->data), vertice_dec->dimensions[0],
+		perm_adj_pmap_dmap);
+
+	//cout << "pt_num  " << pt_num << endl;
+	//cout << "dec_map size = " << dec_map->dimensions[0] << endl;
+	//cout << "dec_pts_num = " << vertice_dec->dimensions[0] << endl;
+	cout << "dec_area_num = " << dec_area_num << endl;
+
+	PyArrayObject* dec_adj = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, c_times);//TODO delete adj
+
+	npy_intp Dims2[1] = { dec_area_num };
+	PyObject* Dec = PyArray_SimpleNewFromData(1, Dims2, NPY_INT, dec_area_id);
+
+	cout << "blur_num = " << blur_num << endl;
+	npy_intp Dims3[1] = { blur_num };
+	PyObject* Blur = PyArray_SimpleNewFromData(1, Dims3, NPY_INT, blur_area_id);
+
+
+
+	PyObject* recover_id = postprocess(
+		Dec, (PyObject*)dec_adj, Blur, (PyObject*)dec_map);
+
+	PyArrayObject* id_np = (PyArrayObject*)PyList_GetItem(recover_id, 0);
+	int* output = (int*)(id_np->data);
+	num = id_np->dimensions[0];
+	return output;
+
+}
+
 
 
 #if defined(AI_DEBUG)

@@ -113,11 +113,17 @@ private:
 	void init_python(string python_path, string script_name);
 
 
-	PyObject* preprocess(float* vertice_ori,int* adj, int pt_num, int init_K, 
+	PyObject* preprocess(PyObject* X, PyObject* Adj, 
 		PartID part_id,int target_num );
-	PyObject* postprocess(int* dec_area_id, int dec_area_num, int* dec_map, int pt_num);
 
-	int* run_graph(float* vertice, int pt_num, PyObject* perm_adj_map, int& out_size);
+	PyObject* postprocess(
+		PyObject* Dec,
+		PyObject* Adj,
+		PyObject* Blur,
+		PyObject* Map
+	);
+
+	auto run_graph(float* vertice, int pt_num, PyObject* perm_adj_map);
 
 };
 

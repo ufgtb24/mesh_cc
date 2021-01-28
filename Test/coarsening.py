@@ -594,8 +594,7 @@ def area_preprocess(vertice, adj, coarsen_levels, target_num, part_id):
     vertice, center = normalize(vertice, part_id)
     vertice, adj, mapping_fwd = decimate(vertice, adj, target_num)
     return multi_coarsen(adj, coarsen_levels) + \
-            [vertice.astype(np.float32), mapping_fwd.astype(np.int32),
-             adj.shape[0]]
+            [vertice.astype(np.float32), mapping_fwd.astype(np.int32)]
 
 
 def normalize(world_coord, part_id):

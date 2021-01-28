@@ -107,16 +107,16 @@ int* Area_Processor::predict(float* vertice_ori, int* adj, int pt_num,
 	int init_K, PartID part_id,int& num)
 {
 	clock_t start0 = clock();
-	PyObject* perm_adj_pmap_dmap = preprocess(vertice_ori,adj, pt_num, init_K, part_id,2000);
+	PyObject* perm_adj_pmap_dv_dmap = preprocess(vertice_ori,adj, pt_num, init_K, part_id,2000);
 	clock_t end0 = clock();
 	cout << "preprocess time: " << end0 - start0 << endl;
 
-	PyArrayObject* vertice_dec = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 1);
-	PyArrayObject* dec_map = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dmap, 3 * c_times + 2);
+	PyArrayObject* vertice_dec = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dv_dmap, 3 * c_times + 1);
+	PyArrayObject* dec_map = (PyArrayObject*)PyList_GetItem(perm_adj_pmap_dv_dmap, 3 * c_times + 2);
 
 	int dec_area_num;
 	int* dec_area_id = run_graph((float*)(vertice_dec->data), vertice_dec->dimensions[0], 
-		perm_adj_pmap_dmap, dec_area_num);
+		perm_adj_pmap_dv_dmap, dec_area_num);
 
 	//cout << "pt_num  " << pt_num << endl;
 	//cout << "dec_map size = " << dec_map->dimensions[0] << endl;

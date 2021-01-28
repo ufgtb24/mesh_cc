@@ -33,7 +33,7 @@ def compute_perm_decimate(parents):
             
             # 每个父节点对应一个 indices_node, 索引上一层中的子节点
             # index of where condition is true
-            indices_node = list((np.where(parent == i)[0]).astype(np.int32))
+            indices_node = list((np.where(parent == i)[0]))
             for idx in indices_node:
                 map_layer[idx] = map_layer_parent[i]
             
@@ -182,7 +182,7 @@ def decimate(vertice, adj, target_num):
 
 
 def recover_area(dec_area_id, mapping_fwd):
-    dec_area_id=dec_area_id.astype(np.int64)
+    dec_area_id=dec_area_id
     pt_num=mapping_fwd.shape[0]
 
     dec_id_sort = np.sort(mapping_fwd)
@@ -269,11 +269,11 @@ def multi_coarsen(adj, coarsen_levels):
             biased = True
         # is_symm, sub = is_Symm(A_in)
         perm_in, A_out, fwd_map = coarsen(A_in, coarsen_level, biased)
-        perms.append(perm_in.astype(np.int32))
+        perms.append(perm_in)
         A_adj = A_out.copy()
         adj = A_to_adj(A_adj)
-        adjs.append(adj.astype(np.int32))
-        pool_maps.append(fwd_map.astype(np.int32))
+        adjs.append(adj)
+        pool_maps.append(fwd_map)
     
     return perms + adjs + pool_maps
 
@@ -477,7 +477,7 @@ def compute_perm(parents):
             
             # 每个父节点对应一个 indices_node, 索引上一层中的子节点
             # index of where condition is true
-            indices_node = list((np.where(parent == i)[0]).astype(np.int32))
+            indices_node = list((np.where(parent == i)[0]))
             
             assert 0 <= len(indices_node) <= 2
             # print('indices_node: {}'.format(indices_node))
@@ -641,7 +641,7 @@ def area_preprocess(vertice, adj, coarsen_levels, target_num, part_id):
     vertice, center = normalize(vertice, part_id)
     vertice, adj, mapping_fwd = decimate(vertice, adj, target_num)
     return multi_coarsen(adj, coarsen_levels) + \
-            [vertice.astype(np.float32), mapping_fwd.astype(np.int32)]
+            [vertice, mapping_fwd]
 
 
 def normalize(world_coord, part_id):
@@ -660,7 +660,7 @@ def normalize(world_coord, part_id):
         local_coord = local_coord * np.array([1, -1, 1], dtype=np.float32)
     elif part_id == 3:
         local_coord = local_coord * np.array([-1, -1, 1], dtype=np.float32)
-    return [local_coord.astype(np.float32), center]
+    return [local_coord, center]
 
 
 def ivs_normalize(local_coord, center, part_id):
@@ -671,7 +671,7 @@ def ivs_normalize(local_coord, center, part_id):
     elif part_id == 3:
         local_coord = local_coord * np.array([-1, -1, 1], dtype=np.float32)
     world_coord = local_coord + center
-    return [world_coord.astype(np.float32)]
+    return [world_coord]
 
 
 def parse_feature(feature_file):
@@ -690,6 +690,6 @@ def parse_feature(feature_file):
 def loss_debug(pred, label_path):
     label = parse_feature(label_path)
     loss = np.mean(np.sum(np.square(label - pred), axis=-1))
-    return [np.array(loss).astype(np.float32)]
+    return [np.array(loss)]
 
 

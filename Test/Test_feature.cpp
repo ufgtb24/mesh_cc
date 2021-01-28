@@ -7,7 +7,7 @@
 
 
 
-int main0()
+int main()
 {
 	string graph_path = "E:/VS_Projects/Mesh/Test/feature_premollar.pb";
 	string python_path = "D:/Python";
@@ -49,7 +49,7 @@ int main0()
 		for (int m = 0; m < feat_num; m++) {
 			for (int n = 0; n < 3; n++) {
 				output_loss[3*m+n] = output[m][n];
-				//cout << output[m][n] << "  ";
+				cout << output[m][n] << "  ";
 			}
 			cout << endl;
 		}

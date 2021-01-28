@@ -95,7 +95,6 @@ void Orientation_Processor::predict(float* vertice_ori, int* adj, int pt_num, in
 			output[i][j] = output_tmp[3 * i + j];
 		}
 	}
-	//Py_DECREF(perms_adjs);
 
 }
 
@@ -129,6 +128,7 @@ float* Orientation_Processor::run_graph(float* vertice, int* adj, int pt_num, in
 		PyArrayObject* perm = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete perm
 
 		const int64_t perm_dims[1] = { perm->dimensions[0] };
+		cout << i << " py_perm shape: " << perm->dimensions[0] << endl;
 
 		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, perm_dims, 1,
 			(int*)(perm->data), (perm->dimensions[0]) * sizeof(int),
@@ -150,7 +150,7 @@ float* Orientation_Processor::run_graph(float* vertice, int* adj, int pt_num, in
 		PyArrayObject* adj = (PyArrayObject*)PyList_GetItem(perms_adjs, i);//TODO delete adj
 
 		const int64_t adj_dims[2] = { adj->dimensions[0],adj->dimensions[1] };
-
+		cout << i-c_times<<" py_adj shape: " << adj->dimensions[0] << ",  " << adj->dimensions[1] << endl;
 		TF_Tensor* tftensor = TF_NewTensor(TF_INT32, adj_dims, 2,
 			(int*)(adj->data), (adj->dimensions[0] * adj->dimensions[1]) * sizeof(int),
 			DeallocateTensor, NULL);

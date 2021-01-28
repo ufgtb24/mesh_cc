@@ -31,9 +31,14 @@ int main1()
 	for (int i = 0; i < 4; i++) {
 		output[i] = new float[4];
 	}
+	//for (int k = 0; k < 5; k++)
+	//{
+		//cout << k << endl;
+		mp->predict(x, adj, actual_pt_num, 13, output);
+		cout << "\n===============\n";
 
-	mp->predict(x, adj, actual_pt_num, 13, output);
-
+	//}
+	//cout << "END";
 
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {

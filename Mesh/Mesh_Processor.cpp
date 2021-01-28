@@ -79,7 +79,6 @@ PyObject* Mesh_Processor::normalize(float* x, int pt_num, PartID part_id)
 	PyTuple_SetItem(ArgArray, 1, Py_BuildValue("i", part_id));
 
 	PyObject* FuncOneBack = PyObject_CallObject(pFunc_Normal, ArgArray);
-
 	return FuncOneBack;
 }
 
